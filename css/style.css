@@ -1,0 +1,112 @@
+html {
+  max-width: 860px;
+  margin: auto;
+}
+
+body {
+  text-align: justify;
+  font-family: Monospace;
+  font-size: 16px;
+}
+
+
+header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid black;
+}
+
+.nav-left {
+  display: inline-block;
+}
+
+.nav-right {
+    float: right;
+}
+
+nav a:link {
+  color: Firebrick;
+  background-color: transparent;
+  text-decoration: none;
+}
+nav a:hover {
+  color: Firebrick;
+  background-color: transparent;
+  text-decoration: underline;
+}
+nav a:visited {
+  color: Firebrick;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+.tldr {
+  background-color: Cornsilk;
+  padding: 10px;
+  border-style: solid;
+  border-width: 1px;
+}
+
+time {
+  color: DimGrey;
+  font-style: Italic;
+  font-size: 14px;
+}
+
+h1 {
+  color: Firebrick;
+  font-size: 22px;
+}
+
+h2 {
+  color: Firebrick;
+  font-size: 20px;
+}
+
+h3 {
+  color: Firebrick;
+  font-size: 18px;
+}
+
+a:link {
+  color: Firebrick;
+  background-color: transparent;
+  text-decoration: none;
+}
+a:hover {
+  color: Firebrick;
+  background-color: transparent;
+  text-decoration: underline;
+}
+a:visited {
+  color: Firebrick;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+code {
+  background-color: WhiteSmoke;
+  font-size: 16px;
+}
+
+.code-block {
+  background-color: WhiteSmoke;
+}
+
+.code-line {
+  background-color: WhiteSmoke;
+  font-size: 14px;
+}
+
+/* https://stackoverflow.com/questions/41306797/html-how-to-add-line-numbers-to-a-source-code-block */
+pre.code-block::before {
+  counter-reset: line;
+}
+pre.code-block code {
+  counter-increment: line;
+}
+pre.code-block code::before {
+  content: counter(line) "| ";
+  display: inline-block;
+  width: 3em;
+  text-align: right;
+}

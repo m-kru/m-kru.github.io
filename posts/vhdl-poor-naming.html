@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../about.html">About</a>
+  | <a href="../contact.html">Contact</a>
+  | <a href="../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>7 Dec, 2023</time><br>
+<h1>VHDL poor naming conventions</h1>
+
+<div class="tldr">
+<p style="margin-top:0px">
+<b>TLDR</b><br>
+<ol>
+  <li>Not every package name requires the <code>_pkg</code> suffix.</li>
+  <li>Do not add the package name as the prefix to the symbols declared within the package.</li>
+  <li>Do not use the source type name in conversion function names. </li>
+  <li>Do not use <code>camelCase</code> or <code>PascalCase</code>.</li>
+</ol>
+</p>
+</div>
+
+<p>
+Naming convention is a very subjective topic.
+I usually don't even get into a discussion as the arguments are hard to prove and irrelevant from the technical perspective.
+However, in the case of VHDL, I often see 4 poor naming conventions having solid arguments against them.
+</p>
+  
+<h2>The "_pkg" suffix</h2>
+
+<p>
+Somehow people writing VHDL descriptions started adding the <code>_pkg</code> suffix to the package names like it was required by the language reference manual.
+What is the point of this?
+Have you seen people adding <code>_lib</code>, <code>_pkg</code>, or <code>_mod</code> suffixes to libraries, packages, or modules in other languages?
+I bet you haven't, and if you have, I bet this is the minority of minority.
+In VHDL, it became an unformal standard.
+</p>
+
+<p>
+If you are an author of some package, you enforce users of your package to type the <code>_pkg</code> suffix every time they refer to a symbol from the package when they haven't imported the symbol, but only the package.
+See the below example.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>library</b> foo;</code>
+<code class="code-line">   <b>use</b> foo.bar_pkg;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>architecture</b> behavioral <b>of</b> some_entity <b>is</b></code>
+<code class="code-line"></code>
+<code class="code-line">  <b>signal</b> a : bar_pkg.type_a := bar_pkg.init();</code>
+<code class="code-line">  <b>signal</b> b : bar_pkg.type_b := bar_pkg.init();</code>
+<code class="code-line"></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line"><b>end</b> <b>architecture</b>;</code>
+</pre>
+
+<p>
+Now, look at the same code but without the <code>_pkg</code> suffix.
+The readability increased even though the example code is very short.
+In the case of actual description, the difference feels like taking a smooth breath.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>library</b> foo;</code>
+<code class="code-line">   <b>use</b> foo.bar;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>architecture</b> behavioral <b>of</b> some_entity <b>is</b></code>
+<code class="code-line"></code>
+<code class="code-line">  <b>signal</b> a : bar.type_a := bar.init();</code>
+<code class="code-line">  <b>signal</b> b : bar.type_b := bar.init();</code>
+<code class="code-line"></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line"><b>end</b> <b>architecture</b>;</code>
+</pre>
+
+<p>
+Some people argue that thanks to the <code>_pkg</code> suffix, they know the symbol denotes a package.
+My question is, what problem does it solve?
+I have never heard any good rationale.
+It always comes down to the same answer: "I just want to know."
+</p>
+
+<p>
+Some people argue that they never use package names as they always import all symbols from the package.
+This is an even worse approach, as they usually add the package name to all symbols names within the package.
+I try to explain why such an approach is bad in the <a href="#package-symbols">Package symbols</a> section.
+</p>
+
+<p>
+There are some cases when adding the <code>_pkg</code> suffix makes a lot of sense.
+The first one is when you provide some entity and the user (usually you are the user of your code) must use custom types or functions to interact with the entity.
+For example, the entity uses custom types for ports.
+In such a case it seems natural (it is even desirable) to name the entity <code>my_entity</code> and the package <code>my_entity_pkg</code>.
+The second case when you probably want to add the <code>_pkg</code> suffix is when you write a generic package.
+In such a case, it seems reasonable to use the <code>_pkg</code> suffix for the generic package declaration and discard the suffix when you instantiate the package.
+There are probably more use cases when adding the <code>_pkg</code> suffix makes sense, but I need help to think of anyone now.
+</p>
+
+<section id="package-symbols">
+<h2>Package symbols</h2>
+
+<p>
+There is a very decent <a href="https://github.com/Paebbels/JSON-for-VHDL">JSON library for VHDL</a>, which is an excellent example of this poor naming convention.
+In short, people add package names to all symbol names declared within the package.
+What problem does it solve? None.
+What problems does it create? At least 2.
+The first one is extra boilerplate.
+The second one is even more boilerplate.
+</p>
+
+<p>
+The first boilerplate is handled by the package authors, as they have to type unnecessary long names within the package.
+See the below 2 code snippets and ask yourself which one is more readable.
+If you think the first one, please <a href="mailto:mkru@protonmail.com">email</a> me explaining why adding package names to symbol names declared within the package is a good idea.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>package</b> foo <b>is</b></code>
+<code class="code-line">   <b>type</b> foo_rec_t <b>is</b> <b>record</b></code>
+<code class="code-line">      a : <b>std_logic</b>;</code>
+<code class="code-line">      b : <b>std_logic</b>;</code>
+<code class="code-line">      c : <b>std_logic_vector</b>(7 <b>downto</b> 0);</code>
+<code class="code-line">   <b>end</b> <b>record</b>;</code>
+<code class="code-line"></code>
+<code class="code-line">   <b>constant</b> foo_rec_const : foo_rec_t := (a => '0', b => '0', c => (<b>others</b> => '0'));</code>
+<code class="code-line"></code>
+<code class="code-line">   <b>function</b> foo_process_rec(rec : foo_rec_t) <b>return</b> foo_rec_t;</code>
+<code class="code-line"><b>end</b> <b>package</b>;</code>
+</pre>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>package</b> foo <b>is</b></code>
+<code class="code-line">   <b>type</b> rec_t <b>is</b> <b>record</b></code>
+<code class="code-line">      a : <b>std_logic</b>;</code>
+<code class="code-line">      b : <b>std_logic</b>;</code>
+<code class="code-line">      c : <b>std_logic_vector</b>(7 <b>downto</b> 0);</code>
+<code class="code-line">   <b>end</b> <b>record</b>;</code>
+<code class="code-line"></code>
+<code class="code-line">   <b>constant</b> rec_const : rec_t := (a => '0', b => '0', c => (<b>others</b> => '0'));</code>
+<code class="code-line"></code>
+<code class="code-line">   <b>function</b> process_rec(rec : rec_t) <b>return</b> rec_t;</code>
+<code class="code-line"><b>end</b> <b>package</b>;</code>
+</pre>
+
+<p>
+The second boilerplate is handled by the package user.
+If you add a package name to symbol names declared within the package, you leave the user no choice.
+The user can't use short names anymore.
+Take a look at the below 2 code snippets.
+The second one is so verbose that it doesn't even make sense.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>library</b> libfoo;</code>
+<code class="code-line">   <b>use</b> libfoo.foo.<b>all</b>;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>architecture</b> behavioral <b>of</b> some_entity <b>is</b></code>
+<code class="code-line"></code>
+<code class="code-line">  <b>constant</b> a : foo_rec_t := foo_rec_const;</code>
+<code class="code-line">  <b>signal</b>   b : foo_rec_t := foo_process_rec(a);</code>
+<code class="code-line"></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line"><b>end</b> <b>architecture</b>;</code>
+</pre>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>library</b> libfoo;</code>
+<code class="code-line">   <b>use</b> libfoo.foo;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>architecture</b> behavioral <b>of</b> some_entity <b>is</b></code>
+<code class="code-line"></code>
+<code class="code-line">  <b>constant</b> a : foo.foo_rec_t := foo.foo_rec_const;</code>
+<code class="code-line">  <b>signal</b>   b : foo.foo_rec_t := foo.foo_process_rec(a);</code>
+<code class="code-line"></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line"><b>end</b> <b>architecture</b>;</code>
+</pre>
+
+<p>
+Now look at the following 2 corresponding code snippets.
+The user now has the freedom to use short names or full symbol paths.
+The first one makes sense when the context in which the package is used is small.
+The second one makes sense when the context uses multiple external packages, and it is reasonable to explicitly indicate which package symbols come from.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>library</b> libfoo;</code>
+<code class="code-line">   <b>use</b> libfoo.foo.<b>all</b>;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>architecture</b> behavioral <b>of</b> some_entity <b>is</b></code>
+<code class="code-line"></code>
+<code class="code-line">  <b>constant</b> a : rec_t := rec_const;</code>
+<code class="code-line">  <b>signal</b>   b : rec_t := process_rec(a);</code>
+<code class="code-line"></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line"><b>end</b> <b>architecture</b>;</code>
+</pre>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>library</b> libfoo;</code>
+<code class="code-line">   <b>use</b> libfoo.foo;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>architecture</b> behavioral <b>of</b> some_entity <b>is</b></code>
+<code class="code-line"></code>
+<code class="code-line">  <b>constant</b> a : foo.rec_t := foo.rec_const;</code>
+<code class="code-line">  <b>signal</b>   b : foo.rec_t := foo.process_rec(a);</code>
+<code class="code-line"></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line"><b>end</b> <b>architecture</b>;</code>
+</pre>
+</section>
+
+<h2>Conversion functions</h2>
+
+<p>
+Many people name conversion functions in such a way that it includes the source type name and the target type name.
+See the below code snippet:
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>package</b> foo <b>is</b></code>
+<code class="code-line">  <b>type</b> animal_t <b>is</b> (APE, BAT, COW);</code>
+<code class="code-line">  <b>type</b> fruit_t  <b>is</b> (APPLE, BANANA, CHERRY);</code>
+<code class="code-line">  <b>type</b> letter_t <b>is</b> (A, B, C);</code>
+<code class="code-line"></code>
+<code class="code-line">  <b>function</b> animal_to_letter (a : animal_t) letter_t;</code>
+<code class="code-line">  <b>function</b> fruit_to_letter  (f : fruit_t)  letter_t;</code>
+<code class="code-line"><b>end</b> <b>package</b>;</code>
+</pre>
+
+<p>
+The questions are as always.
+Why?
+What problem does it solve?
+VHDL is a strongly typed language.
+The user must be so explicit about the typing that converting by accident to an invalid type is (almost?) impossible.
+VHDL was designed to support <a href="https://en.wikipedia.org/wiki/Ad_hoc_polymorphism">ad hoc polymorphism</a>, so it seems reasonable to use this feature.
+In practice, function overloading should be used, with the function name containing only the target type name.
+This is shown in the below snippet.
+Not only is the code shorter, but if you later change the source type name or decide to use a different source type for the same signal, you will not have to adjust the function name, as the target type remains the same.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line"><b>package</b> foo <b>is</b></code>
+<code class="code-line">  <b>type</b> animal_t <b>is</b> (APE, BAT, COW);</code>
+<code class="code-line">  <b>type</b> fruit_t  <b>is</b> (APPLE, BANANA, CHERRY);</code>
+<code class="code-line">  <b>type</b> letter_t <b>is</b> (A, B, C);</code>
+<code class="code-line"></code>
+<code class="code-line">  <b>function</b> to_letter (a : animal_t) letter_t;</code>
+<code class="code-line">  <b>function</b> to_letter (f : fruit_t)  letter_t;</code>
+<code class="code-line"><b>end</b> <b>package</b>;</code>
+</pre>
+
+<h2>camelCase and PascalCase</h2>
+
+<p>
+I generally do not prefer any of the <code>snake_case</code>, <code>camelCase</code>, <code>PascalCase</code>, or <code>Pascal_Snake_Case</code> over the others.
+I usually simply follow what the language or project recommends or enforces.
+However, VHDL is case insensitive.
+This means the following names refer to the same symbol: <code>someName</code>, <code>somename</code>, <code>SOMENAME</code>, <code>SomeName</code>, and <code>sOmEnAmE</code>.
+I remember I once had to get through some code utilizing the <a href="https://github.com/OSVVM/OSVVM">OSVVM</a> library.
+The library mostly uses the <code>PascalCase</code> for symbol names.
+However, the code I had to read used lowercase for everything, so it was full of names looking like this <code>naturalvbooltype</code> instead of <code>NaturalVBoolType</code>.
+As I was already after 10 hours of work, my ability to focus was approaching zero.
+Everything seemed more complex than it was because reading the symbol names required extra effort to separate the words.
+</p>
+
+<p>
+Later on, I analyzed why it was formatted with all lowercase.
+It turned out some person working on the code had some emacs hook reformatting the VHDL code to all lowercase on file save.
+The change was simply committed and pushed to the repo.
+You may use a counterargument that this would never happen if the file was reviewed before being merged.
+The problem with this counterargument is that sometimes there is no one who can review the code, and the person editing the code is not the one who has written it.
+They just want to fix a bug and move forward.
+In the case of the <code>snake_case</code> or <code>Pascal_Snake_Case</code>, the code would never become unreadable, as the floor character '_' is simply an unmodifiable part of the symbol name.
+</p>
+
+<p>
+I do not discourage anyone from using the <a href="https://github.com/OSVVM/OSVVM">OSVVM</a> library.
+I used it solely to present an example of what might happen.
+I instead encourage you to use <code>snake_case</code> or <code>Pascal_Snake_Case</code> for symbol names whenever you have a choice.
+</p>
+  
+</body>
+
+</html>
