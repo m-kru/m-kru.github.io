@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../about.html">About</a>
+  | <a href="../contact.html">Contact</a>
+  | <a href="../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>15 Jan, 2024</time><br>
+<h1>Do not treat POSIX blindly as something worth mimicking</h1>
+
+<p>
+When I found out about the <a href="https://pl.wikipedia.org/wiki/POSIX">POSIX</a> for the first time (I was in the first or second year of my studies), I was thrilled.
+A portable OS interface for Unix designed by above-average developers.
+While I still think the concept of a portable OS interface is a great idea, the POSIX API could be designed better, at least to be more readable.
+By readability, I mean how easy it is to understand the program, which includes two things:
+<ol>
+<li>How easy it is to literally read the code (text) in the source file.</li>
+<li>How easy it is to understand the logic of the program.</li>
+</ol></p>
+
+<p>
+Let's analyze following simple code.
+</p>
+
+<pre class="code-block C">
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <time.h>
+#include <unistd.h>
+
+static timer_t timer_id;
+static struct sigevent sev;
+static struct sigaction sa;
+
+static struct itimerspec interval = {
+	.it_interval = {
+		.tv_sec = 1,
+		.tv_nsec = 0,
+	},
+	.it_value = {
+		.tv_sec = 1,
+		.tv_nsec = 0,
+	}
+};
+
+volatile int cnt;
+void handler(int sig) {
+	cnt++;
+	printf("%d\n", cnt);
+}
+
+void init_timer(void) {
+	sa.sa_handler = handler,
+
+	sigemptyset(&sa.sa_mask);
+	if (sigaction(SIGRTMIN, &sa, NULL))
+		exit(-1);
+
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGRTMIN);
+	if (sigprocmask(SIG_UNBLOCK, &mask, NULL))
+		exit(-2);
+
+	sev.sigev_notify = SIGEV_SIGNAL;
+	sev.sigev_signo = SIGRTMIN;
+	if (timer_create(CLOCK_MONOTONIC, &sev, &timer_id))
+		exit(-3);
+
+	if (timer_settime(timer_id, 0, &interval, NULL))
+		exit(-4);
+}
+
+void disarm(void) {
+	interval.it_value.tv_sec = 0;
+	interval.it_value.tv_nsec = 0;
+	if (timer_settime(timer_id, 0, &interval, NULL))
+		exit(-5);
+}
+
+int main(int argc, char *argv[]) {
+	init_timer();
+	while (cnt < 3);
+	disarm();
+	sleep(3);
+	return 0;
+}
+</pre>
+
+<p>
+The logic of the program is very simple.
+It creates a timer, counts to 3, sleeps for 3 seconds, and exits.
+Error handling was omitted for brevity (actually, it handles errors by exiting).
+We need three structs to create a timer and execute some action when it expires: <code>timer_t</code>, <code>sigevent</code>, <code>sigaction</code>.
+Nothing exceptional or interesting so far.
+Of course, different timers and configurations are available, which can be checked, for example, in the <code>man timer_create</code>.
+However, timer types and configurations are not in the scope of this post.
+Remember to add <code>-lrt</code> during the linking stage if you want to compile the example.
+</p>
+
+<p>
+The first thing I would like to complain about is struct filed names.
+Namely, why are struct field names prefixed with the struct name abbreviation?
+I have no idea.
+Look at the following snippet presenting how it is and how I would like it to be.
+Which one is more readable for you?
+</p>
+
+<pre class="code-block C">
+// How it is.
+static struct itimerspec interval = {
+	.it_interval = {
+		.tv_sec = 1,
+		.tv_nsec = 0,
+	},
+	.it_value = {
+		.tv_sec = 1,
+		.tv_nsec = 0,
+	}
+};
+
+// How I would like it to be.
+static struct itimerspec interval = {
+	.interval = {
+		.sec = 1,
+		.nsec = 0,
+	},
+	.value = {
+		.sec = 1,
+		.nsec = 0,
+	}
+};
+</pre>
+
+<p>
+This prefixed struct field naming convention is omnipresent, and in my opinion, it makes the code look more complex than it really is, especially in real projects, not some simple timer example.
+Nevertheless, the naming issue is minor compared to the second one, which I would like to complain about.
+</p>
+
+<p>
+My second complaint is about taking action based on data value, not via function.
+What I mean is that when I want to take some action, I would like to call a function with a name denoting this action.
+The data should only be used to configure the action.
+The POSIX is not consistent in this matter.
+Sometimes, you call a function with a name denoting the action, sometimes, you have to call a function and provide very specific data value to take different action.
+In the case of the example timer, it can be noticed based on how the timer is disarmed.
+Have a look at the following documentation snippet from the <code>man timer_settime</code>.
+</p>
+
+<div class="quote">
+<p>
+If new_value‐>it_value specifies a nonzero value (i.e., either subfield is nonzero), then timer_settime() arms (starts) the timer, setting it to initially expire at the given time.
+(If the timer was already armed, then the previous settings are overwritten.) If new_value‐>it_value specifies a zero value (i.e., both subfields are zero), then the timer is disarmed.
+</p>
+</div>
+
+<p>
+To disarm a timer, one must call <code>timer_settime</code> function with both subfields of the <code>it_value</code> struct of the <code>new_value</code> parameter set to zero.
+Could this part of the API be designed better?
+I believe it could.
+Why not simply provide <code>timer_disarm</code> function?
+Not only would it be easier to analyze the logic of the program, but also, such a function would require fewer arguments.
+The <code>timer_settime</code> function signature looks as follows:
+</p>
+
+<pre class="code-block C">
+int timer_settime(
+	timer_t timerid,
+	int flags,
+	const struct itimerspec *new_value,
+	struct itimerspec *old_value
+);
+</pre>
+
+<p>
+The signature of the potential <code>timer_disarm</code> function could look as follows:
+</p>
+<pre class="code-block C">
+int timer_disarm(
+	timer_t timerid,
+	int flags,
+	struct itimerspec *old_value
+);
+</pre>
+
+<p>
+Finally, let's have a look how the example timer program would like, if we could apply proposed changes.
+</p>
+
+<pre class="code-block C">
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <time.h>
+#include <unistd.h>
+
+static timer_t timer_id;
+static struct sigevent sev;
+static struct sigaction sa;
+
+static struct itimerspec interval = {
+	.interval = {
+		.sec = 1,
+		.nsec = 0,
+	},
+	.value = {
+		.sec = 1,
+		.nsec = 0,
+	}
+};
+
+volatile int cnt;
+void handler(int sig) {
+	cnt++;
+	printf("%d\n", cnt);
+}
+
+void init_timer(void) {
+	sa.handler = handler,
+
+	sigemptyset(&sa.mask);
+	if (sigaction(SIGRTMIN, &sa, NULL))
+		exit(-1);
+
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGRTMIN);
+	if (sigprocmask(SIG_UNBLOCK, &mask, NULL))
+		exit(-2);
+
+	sev.sigev_notify = SIGEV_SIGNAL;
+	sev.sigev_signo = SIGRTMIN;
+	if (timer_create(CLOCK_MONOTONIC, &sev, &timer_id))
+		exit(-3);
+
+	if (timer_settime(timer_id, 0, &interval, NULL))
+		exit(-4);
+}
+
+int main(int argc, char *argv[]) {
+	init_timer();
+	while (cnt < 3);
+	timer_disarm(timer_id, 0, NULL);
+	sleep(3);
+	return 0;
+}
+</pre>
+
+</body>
+</html>
