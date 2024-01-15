@@ -22,7 +22,7 @@
 </header>
 
 <time>15 Jan, 2024</time><br>
-<h1>Do not treat POSIX blindly as something worth mimicking</h1>
+<h1>Do not blindly treat POSIX as something worth mimicking</h1>
 
 <p>
 When I found out about the <a href="https://pl.wikipedia.org/wiki/POSIX">POSIX</a> for the first time (I was in the first or second year of my studies), I was thrilled.
@@ -39,69 +39,69 @@ Let's analyze following simple code.
 </p>
 
 <pre class="code-block C">
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <time.h>
-#include <unistd.h>
-
-static timer_t timer_id;
-static struct sigevent sev;
-static struct sigaction sa;
-
-static struct itimerspec interval = {
-	.it_interval = {
-		.tv_sec = 1,
-		.tv_nsec = 0,
-	},
-	.it_value = {
-		.tv_sec = 1,
-		.tv_nsec = 0,
-	}
-};
-
-volatile int cnt;
-void handler(int sig) {
-	cnt++;
-	printf("%d\n", cnt);
-}
-
-void init_timer(void) {
-	sa.sa_handler = handler,
-
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGRTMIN, &sa, NULL))
-		exit(-1);
-
-	sigset_t mask;
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGRTMIN);
-	if (sigprocmask(SIG_UNBLOCK, &mask, NULL))
-		exit(-2);
-
-	sev.sigev_notify = SIGEV_SIGNAL;
-	sev.sigev_signo = SIGRTMIN;
-	if (timer_create(CLOCK_MONOTONIC, &sev, &timer_id))
-		exit(-3);
-
-	if (timer_settime(timer_id, 0, &interval, NULL))
-		exit(-4);
-}
-
-void disarm(void) {
-	interval.it_value.tv_sec = 0;
-	interval.it_value.tv_nsec = 0;
-	if (timer_settime(timer_id, 0, &interval, NULL))
-		exit(-5);
-}
-
-int main(int argc, char *argv[]) {
-	init_timer();
-	while (cnt < 3);
-	disarm();
-	sleep(3);
-	return 0;
-}
+<code class="code-line"><b>#include</b> &ltstdio.h></code>
+<code class="code-line"><b>#include</b> &ltstdlib.h></code>
+<code class="code-line"><b>#include</b> &ltsignal.h></code>
+<code class="code-line"><b>#include</b> &lttime.h></code>
+<code class="code-line"><b>#include</b> &ltunistd.h></code>
+<code class="code-line"></code>
+<code class="code-line"><b>static</b> timer_t timer_id;</code>
+<code class="code-line"><b>static</b> <b>struct</b> sigevent sev;</code>
+<code class="code-line"><b>static</b> <b>struct</b> sigaction sa;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>static</b> <b>struct</b> itimerspec interval = {</code>
+<code class="code-line">    .it_interval = {</code>
+<code class="code-line">        .tv_sec = 1,</code>
+<code class="code-line">        .tv_nsec = 0,</code>
+<code class="code-line">    },</code>
+<code class="code-line">    .it_value = {</code>
+<code class="code-line">        .tv_sec = 1,</code>
+<code class="code-line">        .tv_nsec = 0,</code>
+<code class="code-line">    }</code>
+<code class="code-line">};</code>
+<code class="code-line"></code>
+<code class="code-line"><b>volatile</b> <b>int</b> cnt;</code>
+<code class="code-line"><b>void</b> handler(<b>int</b> sig) {</code>
+<code class="code-line">    cnt++;</code>
+<code class="code-line">    printf("%d\n", cnt);</code>
+<code class="code-line">}</code>
+<code class="code-line"></code>
+<code class="code-line"><b>void</b> init_timer(<b>void</b>) {</code>
+<code class="code-line">    sa.sa_handler = handler,</code>
+<code class="code-line"></code>
+<code class="code-line">    sigemptyset(&sa.sa_mask);</code>
+<code class="code-line">    <b>if</b> (sigaction(SIGRTMIN, &sa, NULL))</code>
+<code class="code-line">        exit(-1);</code>
+<code class="code-line"></code>
+<code class="code-line">    sigset_t mask;</code>
+<code class="code-line">    sigemptyset(&mask);</code>
+<code class="code-line">    sigaddset(&mask, SIGRTMIN);</code>
+<code class="code-line">    <b>if</b> (sigprocmask(SIG_UNBLOCK, &mask, NULL))</code>
+<code class="code-line">        exit(-2);</code>
+<code class="code-line"></code>
+<code class="code-line">    sev.sigev_notify = SIGEV_SIGNAL;</code>
+<code class="code-line">    sev.sigev_signo = SIGRTMIN;</code>
+<code class="code-line">    <b>if</b> (timer_create(CLOCK_MONOTONIC, &sev, &timer_id))</code>
+<code class="code-line">        exit(-3);</code>
+<code class="code-line"></code>
+<code class="code-line">    <b>if</b> (timer_settime(timer_id, 0, &interval, NULL))</code>
+<code class="code-line">        exit(-4);</code>
+<code class="code-line">}</code>
+<code class="code-line"></code>
+<code class="code-line"><b>void</b> disarm(<b>void</b>) {</code>
+<code class="code-line">    interval.it_value.tv_sec = 0;</code>
+<code class="code-line">    interval.it_value.tv_nsec = 0;</code>
+<code class="code-line">    <b>if</b> (timer_settime(timer_id, 0, &interval, NULL))</code>
+<code class="code-line">        exit(-5);</code>
+<code class="code-line">}</code>
+<code class="code-line"></code>
+<code class="code-line"><b>int</b> main(<b>int</b> argc, <b>char</b> *argv[]) {</code>
+<code class="code-line">    init_timer();</code>
+<code class="code-line">    <b>while</b> (cnt &lt 3);</code>
+<code class="code-line">    disarm();</code>
+<code class="code-line">    sleep(3);</code>
+<code class="code-line">    <b>return</b> 0;</code>
+<code class="code-line">}</code>
 </pre>
 
 <p>
@@ -124,29 +124,29 @@ Which one is more readable for you?
 </p>
 
 <pre class="code-block C">
-// How it is.
-static struct itimerspec interval = {
-	.it_interval = {
-		.tv_sec = 1,
-		.tv_nsec = 0,
-	},
-	.it_value = {
-		.tv_sec = 1,
-		.tv_nsec = 0,
-	}
-};
-
-// How I would like it to be.
-static struct itimerspec interval = {
-	.interval = {
-		.sec = 1,
-		.nsec = 0,
-	},
-	.value = {
-		.sec = 1,
-		.nsec = 0,
-	}
-};
+<code class="code-line">//<i> How it is.</i></code>
+<code class="code-line"><b>static</b> <b>struct</b> itimerspec interval = {</code>
+<code class="code-line">    .it_interval = {</code>
+<code class="code-line">        .tv_sec = 1,</code>
+<code class="code-line">        .tv_nsec = 0,</code>
+<code class="code-line">    },</code>
+<code class="code-line">    .it_value = {</code>
+<code class="code-line">        .tv_sec = 1,</code>
+<code class="code-line">        .tv_nsec = 0,</code>
+<code class="code-line">    }</code>
+<code class="code-line">};</code>
+<code class="code-line"></code>
+<code class="code-line">//<i> How I would like it to be.</i></code>
+<code class="code-line"><b>static</b> <b>struct</b> itimerspec interval = {</code>
+<code class="code-line">    .interval = {</code>
+<code class="code-line">        .sec = 1,</code>
+<code class="code-line">        .nsec = 0,</code>
+<code class="code-line">    },</code>
+<code class="code-line">    .value = {</code>
+<code class="code-line">        .sec = 1,</code>
+<code class="code-line">        .nsec = 0,</code>
+<code class="code-line">    }</code>
+<code class="code-line">};</code>
 </pre>
 
 <p>
@@ -181,23 +181,23 @@ The <code>timer_settime</code> function signature looks as follows:
 </p>
 
 <pre class="code-block C">
-int timer_settime(
-	timer_t timerid,
-	int flags,
-	const struct itimerspec *new_value,
-	struct itimerspec *old_value
-);
+<code class="code-line"><b>int</b> timer_settime(</code>
+<code class="code-line">    timer_t timerid,</code>
+<code class="code-line">    <b>int</b> flags,</code>
+<code class="code-line">    <b>const</b> <b>struct</b> itimerspec *new_value,</code>
+<code class="code-line">    <b>struct</b> itimerspec *old_value</code>
+<code class="code-line">);</code>
 </pre>
 
 <p>
 The signature of the potential <code>timer_disarm</code> function could look as follows:
 </p>
 <pre class="code-block C">
-int timer_disarm(
-	timer_t timerid,
-	int flags,
-	struct itimerspec *old_value
-);
+<code class="code-line"><b>int</b> timer_disarm(</code>
+<code class="code-line">    timer_t timerid,</code>
+<code class="code-line">    <b>int</b> flags,</code>
+<code class="code-line">    <b>struct</b> itimerspec *old_value</code>
+<code class="code-line">);</code>
 </pre>
 
 <p>
@@ -205,62 +205,62 @@ Finally, let's have a look how the example timer program would like, if we could
 </p>
 
 <pre class="code-block C">
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <time.h>
-#include <unistd.h>
-
-static timer_t timer_id;
-static struct sigevent sev;
-static struct sigaction sa;
-
-static struct itimerspec interval = {
-	.interval = {
-		.sec = 1,
-		.nsec = 0,
-	},
-	.value = {
-		.sec = 1,
-		.nsec = 0,
-	}
-};
-
-volatile int cnt;
-void handler(int sig) {
-	cnt++;
-	printf("%d\n", cnt);
-}
-
-void init_timer(void) {
-	sa.handler = handler,
-
-	sigemptyset(&sa.mask);
-	if (sigaction(SIGRTMIN, &sa, NULL))
-		exit(-1);
-
-	sigset_t mask;
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGRTMIN);
-	if (sigprocmask(SIG_UNBLOCK, &mask, NULL))
-		exit(-2);
-
-	sev.sigev_notify = SIGEV_SIGNAL;
-	sev.sigev_signo = SIGRTMIN;
-	if (timer_create(CLOCK_MONOTONIC, &sev, &timer_id))
-		exit(-3);
-
-	if (timer_settime(timer_id, 0, &interval, NULL))
-		exit(-4);
-}
-
-int main(int argc, char *argv[]) {
-	init_timer();
-	while (cnt < 3);
-	timer_disarm(timer_id, 0, NULL);
-	sleep(3);
-	return 0;
-}
+<code class="code-line"><b>#include</b> &ltstdio.h></code>
+<code class="code-line"><b>#include</b> &ltstdlib.h></code>
+<code class="code-line"><b>#include</b> &ltsignal.h></code>
+<code class="code-line"><b>#include</b> &lttime.h></code>
+<code class="code-line"><b>#include</b> &ltunistd.h></code>
+<code class="code-line"></code>
+<code class="code-line"><b>static</b> timer_t timer_id;</code>
+<code class="code-line"><b>static</b> <b>struct</b> sigevent sev;</code>
+<code class="code-line"><b>static</b> <b>struct</b> sigaction sa;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>static</b> <b>struct</b> itimerspec interval = {</code>
+<code class="code-line">    .interval = {</code>
+<code class="code-line">        .sec = 1,</code>
+<code class="code-line">        .nsec = 0,</code>
+<code class="code-line">    },</code>
+<code class="code-line">    .value = {</code>
+<code class="code-line">        .sec = 1,</code>
+<code class="code-line">        .nsec = 0,</code>
+<code class="code-line">    }</code>
+<code class="code-line">};</code>
+<code class="code-line"></code>
+<code class="code-line"><b>volatile</b> <b>int</b> cnt;</code>
+<code class="code-line"><b>void</b> handler(<b>int</b> sig) {</code>
+<code class="code-line">    cnt++;</code>
+<code class="code-line">    printf("%d\n", cnt);</code>
+<code class="code-line">}</code>
+<code class="code-line"></code>
+<code class="code-line"><b>void</b> init_timer(<b>void</b>) {</code>
+<code class="code-line">    sa.handler = handler,</code>
+<code class="code-line"></code>
+<code class="code-line">    sigemptyset(&sa.mask);</code>
+<code class="code-line">    <b>if</b> (sigaction(SIGRTMIN, &sa, NULL))</code>
+<code class="code-line">        exit(-1);</code>
+<code class="code-line"></code>
+<code class="code-line">    sigset_t mask;</code>
+<code class="code-line">    sigemptyset(&mask);</code>
+<code class="code-line">    sigaddset(&mask, SIGRTMIN);</code>
+<code class="code-line">    <b>if</b> (sigprocmask(SIG_UNBLOCK, &mask, NULL))</code>
+<code class="code-line">        exit(-2);</code>
+<code class="code-line"></code>
+<code class="code-line">    sev.sigev_notify = SIGEV_SIGNAL;</code>
+<code class="code-line">    sev.sigev_signo = SIGRTMIN;</code>
+<code class="code-line">    <b>if</b> (timer_create(CLOCK_MONOTONIC, &sev, &timer_id))</code>
+<code class="code-line">        exit(-3);</code>
+<code class="code-line"></code>
+<code class="code-line">    <b>if</b> (timer_settime(timer_id, 0, &interval, NULL))</code>
+<code class="code-line">        exit(-4);</code>
+<code class="code-line">}</code>
+<code class="code-line"></code>
+<code class="code-line"><b>int</b> main(<b>int</b> argc, <b>char</b> *argv[]) {</code>
+<code class="code-line">    init_timer();</code>
+<code class="code-line">    <b>while</b> (cnt &lt 3);</code>
+<code class="code-line">    timer_disarm(timer_id, 0, NULL);</code>
+<code class="code-line">    sleep(3);</code>
+<code class="code-line">    <b>return</b> 0;</code>
+<code class="code-line">}</code>
 </pre>
 
 </body>
