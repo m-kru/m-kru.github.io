@@ -29,7 +29,7 @@
 <b>TLDR</b><br>
 <ol>
   <li>The APB is a simple and well-designed on-chip bus.</li>
-  <li>The mode view mechanism introduced in the VHDL 2019 revision allows writing more concise descriptions. However, there are some corner cases when library maintainers might actually have to write more description than in the case when they use the traditional two-record approach. Such a case might happen during subelement signal assignments between two signals declared using mode view.</li>
+  <li>The mode view mechanism introduced in the VHDL 2019 revision allows writing more concise descriptions. However, there are some corner cases when library maintainers might actually have to write more description than in the case when they use the traditional two-records approach. Such a case might happen during subelement signal assignments between two signals declared using mode view.</li>
   <li>The advantages brought by the mode view are outweighed by the disadvantages. The main blocker for the VHDL 2019 mode view adoption is the lack of support in EDA tools.</li>
 </ol>
 </p>
@@ -231,38 +231,38 @@ However, this record is not an interface from the VHDL point of view.
 </p>
 
 <pre class="code-block VHDL">
--- Mode view approach
-
-type interface_t is record
-  addr   : unsigned(31 downto 0);
-  prot   : protection_t;
-  nse    : std_logic;
-  selx   : std_logic;
-  enable : std_logic;
-  write  : std_logic;
-  wdata  : std_logic_vector(31 downto 0);
-  strb   : std_logic_vector( 3 downto 0);
-  ready  : std_logic;
-  rdata  : std_logic_vector(31 downto 0);
-  slverr : std_logic;
-  wakeup : std_logic;
-  auser  : std_logic_vector(127 downto 0);
-  wuser  : std_logic_vector( 15 downto 0);
-  ruser  : std_logic_vector( 15 downto 0);
-  buser  : std_logic_vector( 15 downto 0);
-end record;
-
-type interface_array_t is array (natural range <>) of interface_t;
-
-view requester_view of interface_t is
-  addr : out; prot : out; nse : out; selx : out;
-  enable : out; write : out; wdata : out; strb : out;
-  ready : in; rdata : in; slverr : in;
-  wakeup : out; auser : out; wuser : out;
-  ruser : in; buser  : in;
-end view;
-
-alias completer_view is requester_view'converse;
+<code class="code-line">--<i> Mode view approach - VHDL 2019</i></code>
+<code class="code-line"></code>
+<code class="code-line"><b>type</b> interface_t <b>is</b> <b>record</b></code>
+<code class="code-line">  addr   : <b>unsigned</b>(31 <b>downto</b> 0);</code>
+<code class="code-line">  prot   : protection_t;</code>
+<code class="code-line">  nse    : <b>std_logic</b>;</code>
+<code class="code-line">  selx   : <b>std_logic</b>;</code>
+<code class="code-line">  enable : <b>std_logic</b>;</code>
+<code class="code-line">  write  : <b>std_logic</b>;</code>
+<code class="code-line">  wdata  : <b>std_logic_vector</b>(31 <b>downto</b> 0);</code>
+<code class="code-line">  strb   : <b>std_logic_vector</b>( 3 <b>downto</b> 0);</code>
+<code class="code-line">  ready  : <b>std_logic</b>;</code>
+<code class="code-line">  rdata  : <b>std_logic_vector</b>(31 <b>downto</b> 0);</code>
+<code class="code-line">  slverr : <b>std_logic</b>;</code>
+<code class="code-line">  wakeup : <b>std_logic</b>;</code>
+<code class="code-line">  auser  : <b>std_logic_vector</b>(127 <b>downto</b> 0);</code>
+<code class="code-line">  wuser  : <b>std_logic_vector</b>( 15 <b>downto</b> 0);</code>
+<code class="code-line">  ruser  : <b>std_logic_vector</b>( 15 <b>downto</b> 0);</code>
+<code class="code-line">  buser  : <b>std_logic_vector</b>( 15 <b>downto</b> 0);</code>
+<code class="code-line"><b>end</b> <b>record</b>;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>type</b> interface_array_t <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> interface_t;</code>
+<code class="code-line"></code>
+<code class="code-line">view requester_view <b>of</b> interface_t <b>is</b></code>
+<code class="code-line">  addr : <b>out</b>; prot : <b>out</b>; nse : <b>out</b>; selx : <b>out</b>;</code>
+<code class="code-line">  enable : <b>out</b>; write : <b>out</b>; wdata : <b>out</b>; strb : <b>out</b>;</code>
+<code class="code-line">  ready : <b>in</b>; rdata : <b>in</b>; slverr : <b>in</b>;</code>
+<code class="code-line">  wakeup : <b>out</b>; auser : <b>out</b>; wuser : <b>out</b>;</code>
+<code class="code-line">  ruser : <b>in</b>; buser  : <b>in</b>;</code>
+<code class="code-line"><b>end</b> view;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>alias</b> completer_view <b>is</b> requester_view'converse;</code>
 </pre>
 
 <p>
@@ -270,38 +270,38 @@ The below snippet presents how the same is usually achieved in the pre-VHDL 2019
 </p>
 
 <pre class="code-block VHDL">
--- Two record approach
-
-type requester_out_t is record
-  addr   : unsigned(31 downto 0);
-  prot   : protection_t;
-  nse    : std_logic;
-  selx   : std_logic;
-  enable : std_logic;
-  write  : std_logic;
-  wdata  : std_logic_vector(31 downto 0);
-  strb   : std_logic_vector( 3 downto 0);
-  wakeup : std_logic;
-  auser  : std_logic_vector(127 downto 0);
-  wuser  : std_logic_vector( 15 downto 0);
-end record;
-
-type requester_in_t is record
-  ready  : std_logic;
-  rdata  : std_logic_vector(31 downto 0);
-  slverr : std_logic;
-  ruser  : std_logic_vector( 15 downto 0);
-  buser  : std_logic_vector( 15 downto 0);
-end record;
-
-type requester_out_array_t is array (natural range <>) of requester_out_t;
-type requester_in_array_t  is array (natural range <>) of requester_in_t;
-
-subtype completer_in_t  is requester_out_t;
-subtype completer_out_t is requester_in_t;
-
-type completer_out_array_t is array (natural range <>) of completer_out_t;
-type completer_in_array_t  is array (natural range <>) of completer_in_t;
+<code class="code-line">--<i> Two-records approach - pre-VHDL 2019</i></code>
+<code class="code-line"></code>
+<code class="code-line"><b>type</b> requester_out_t <b>is</b> <b>record</b></code>
+<code class="code-line">  addr   : <b>unsigned</b>(31 <b>downto</b> 0);</code>
+<code class="code-line">  prot   : protection_t;</code>
+<code class="code-line">  nse    : <b>std_logic</b>;</code>
+<code class="code-line">  selx   : <b>std_logic</b>;</code>
+<code class="code-line">  enable : <b>std_logic</b>;</code>
+<code class="code-line">  write  : <b>std_logic</b>;</code>
+<code class="code-line">  wdata  : <b>std_logic_vector</b>(31 <b>downto</b> 0);</code>
+<code class="code-line">  strb   : <b>std_logic_vector</b>( 3 <b>downto</b> 0);</code>
+<code class="code-line">  wakeup : <b>std_logic</b>;</code>
+<code class="code-line">  auser  : <b>std_logic_vector</b>(127 <b>downto</b> 0);</code>
+<code class="code-line">  wuser  : <b>std_logic_vector</b>( 15 <b>downto</b> 0);</code>
+<code class="code-line"><b>end</b> <b>record</b>;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>type</b> requester_in_t <b>is</b> <b>record</b></code>
+<code class="code-line">  ready  : <b>std_logic</b>;</code>
+<code class="code-line">  rdata  : <b>std_logic_vector</b>(31 <b>downto</b> 0);</code>
+<code class="code-line">  slverr : <b>std_logic</b>;</code>
+<code class="code-line">  ruser  : <b>std_logic_vector</b>( 15 <b>downto</b> 0);</code>
+<code class="code-line">  buser  : <b>std_logic_vector</b>( 15 <b>downto</b> 0);</code>
+<code class="code-line"><b>end</b> <b>record</b>;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>type</b> requester_out_array_t <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> requester_out_t;</code>
+<code class="code-line"><b>type</b> requester_in_array_t  <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> requester_in_t;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>subtype</b> completer_in_t  <b>is</b> requester_out_t;</code>
+<code class="code-line"><b>subtype</b> completer_out_t <b>is</b> requester_in_t;</code>
+<code class="code-line"></code>
+<code class="code-line"><b>type</b> completer_out_array_t <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> completer_out_t;</code>
+<code class="code-line"><b>type</b> completer_in_array_t  <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> completer_in_t;</code>
 </pre>
 
 <p>
@@ -311,20 +311,20 @@ I have chosen a Crossbar because it will allow me to show some inconvenience of 
 <p>
 
 <pre class="code-block VHDL">
-entity Crossbar is
-  generic (
-    REQUESTER_COUNT : positive := 1;
-    COMPLETER_COUNT : positive := 1;
-    ADDRS  : addr_array_t(0 to COMPLETER_COUNT - 1); -- Completer addresses 
-    MASKS  : mask_array_t(0 to COMPLETER_COUNT - 1)  -- Completer address masks
-  );
-  port (
-    arstn_i : in std_logic := '1';
-    clk_i   : in std_logic;
-    requesters : view (completer_view) of interface_array_t(0 to REQUESTER_COUNT - 1);
-    completers : view (requester_view) of interface_array_t(0 to COMPLETER_COUNT - 1)
-  );
-end entity;
+<code class="code-line"><b>entity</b> Crossbar <b>is</b></code>
+<code class="code-line">  <b>generic</b> (</code>
+<code class="code-line">    REQUESTER_COUNT : <b>positive</b> := 1;</code>
+<code class="code-line">    COMPLETER_COUNT : <b>positive</b> := 1;</code>
+<code class="code-line">    ADDRS  : addr_array_t(0 <b>to</b> COMPLETER_COUNT - 1); --<i> Completer addresses </i></code>
+<code class="code-line">    MASKS  : mask_array_t(0 <b>to</b> COMPLETER_COUNT - 1)  --<i> Completer address masks</i></code>
+<code class="code-line">  );</code>
+<code class="code-line">  <b>port</b> (</code>
+<code class="code-line">    arstn_i : <b>in</b> <b>std_logic</b> := '1';</code>
+<code class="code-line">    clk_i   : <b>in</b> <b>std_logic</b>;</code>
+<code class="code-line">    requesters : view (completer_view) <b>of</b> interface_array_t(0 <b>to</b> REQUESTER_COUNT - 1);</code>
+<code class="code-line">    completers : view (requester_view) <b>of</b> interface_array_t(0 <b>to</b> COMPLETER_COUNT - 1)</code>
+<code class="code-line">  );</code>
+<code class="code-line"><b>end</b> <b>entity</b>;</code>
 </pre>
 
 <p>
@@ -332,22 +332,22 @@ The below snippet presents how the same is usually achieved in the pre-VHDL 2019
 </p>
 
 <pre class="code-block VHDL">
-entity Crossbar is
-  generic (
-    REQUESTER_COUNT : positive := 1;
-    COMPLETER_COUNT : positive := 1;
-    ADDRS  : addr_array_t(0 to COMPLETER_COUNT - 1); -- Completer addresses 
-    MASKS  : mask_array_t(0 to COMPLETER_COUNT - 1)  -- Completer address masks
-  );
-  port (
-    arstn_i : in std_logic := '1';
-    clk_i   : in std_logic;
-    requesters_out_i : in  requester_out_array_t(0 to REQUESTER_COUNT - 1);
-    requesters_in_o  : out requester_in_array_t(0 to REQUESTER_COUNT - 1);
-    completers_in_o  : in  completer_in_array_t(0 to COMPLETER_COUNT - 1);
-    completers_out_i : out compleyer_out_array_t(0 to COMPLETER_COUNT - 1)
-  );
-end entity;
+<code class="code-line"><b>entity</b> Crossbar <b>is</b></code>
+<code class="code-line">  <b>generic</b> (</code>
+<code class="code-line">    REQUESTER_COUNT : <b>positive</b> := 1;</code>
+<code class="code-line">    COMPLETER_COUNT : <b>positive</b> := 1;</code>
+<code class="code-line">    ADDRS  : addr_array_t(0 <b>to</b> COMPLETER_COUNT - 1); --<i> Completer addresses </i></code>
+<code class="code-line">    MASKS  : mask_array_t(0 <b>to</b> COMPLETER_COUNT - 1)  --<i> Completer address masks</i></code>
+<code class="code-line">  );</code>
+<code class="code-line">  <b>port</b> (</code>
+<code class="code-line">    arstn_i : <b>in</b> <b>std_logic</b> := '1';</code>
+<code class="code-line">    clk_i   : <b>in</b> <b>std_logic</b>;</code>
+<code class="code-line">    requesters_out_i : <b>in</b>  requester_out_array_t(0 <b>to</b> REQUESTER_COUNT - 1);</code>
+<code class="code-line">    requesters_in_o  : <b>out</b> requester_in_array_t(0 <b>to</b> REQUESTER_COUNT - 1);</code>
+<code class="code-line">    completers_in_o  : <b>in</b>  completer_in_array_t(0 <b>to</b> COMPLETER_COUNT - 1);</code>
+<code class="code-line">    completers_out_i : <b>out</b> compleyer_out_array_t(0 <b>to</b> COMPLETER_COUNT - 1)</code>
+<code class="code-line">  );</code>
+<code class="code-line"><b>end</b> <b>entity</b>;</code>
 </pre>
 
 <p>
@@ -365,8 +365,8 @@ For example, something like this:
 </p>
 
 <pre class="code-block VHDL">
-completers(c) <= requesters(r);
-requesters(r) <= completers(c);
+<code class="code-line">completers(c) &lt= requesters(r);</code>
+<code class="code-line">requesters(r) &lt= completers(c);</code>
 </pre>
 
 <p>
@@ -375,7 +375,7 @@ You have to do it one by one for each out subelement, or you will get an error.
 For example, with the <a href="https://github.com/nickg/nvc">nvc</a> simulator, I get the following error:
 </p>
 
-<pre class="code-block">
+<div class="code"><p><pre>
 ** Error: cannot assign to port COMPLETERS with mode view indication as one or more
           sub-elements have mode IN
      > /home/mkru/workspace/vhdl/vhdl-amba5/apb/crossbar.vhd:174
@@ -384,7 +384,7 @@ For example, with the <a href="https://github.com/nickg/nvc">nvc</a> simulator, 
      |           ^^^^^^^^^^^^^ target of signal assignment
      |
      = Note: element READY declared with mode IN
-</pre>
+</pre></p></div>
 
 <p>
 Of course, you can come around this inconvenience by defining a procedure for subelement assignments between two signals with given mode views.
@@ -392,27 +392,27 @@ For example, something like this:
 </p>
 
 <pre class="code-block VHDL">
-procedure assign (
-  signal req : view completer_view; signal com : view requester_view
-) is
-begin
-  com.addr   <= req.addr;
-  com.prot   <= req.prot;
-  com.nse    <= req.nse;
-  com.selx   <= req.selx;
-  com.enable <= req.enable;
-  com.write  <= req.write;
-  com.wdata  <= req.wdata;
-  com.strb   <= req.strb;
-  com.auser  <= req.auser;
-  com.wuser  <= req.wuser;
-
-  req.ready  <= com.ready;
-  req.rdata  <= com.rdata;
-  req.slverr <= com.slverr;
-  req.ruser  <= com.ruser;
-  req.buser  <= com.buser;
-end procedure;
+<code class="code-line"><b>procedure</b> assign (</code>
+<code class="code-line">  <b>signal</b> req : view completer_view; <b>signal</b> com : view requester_view</code>
+<code class="code-line">) <b>is</b></code>
+<code class="code-line"><b>begin</b></code>
+<code class="code-line">  com.addr   &lt= req.addr;</code>
+<code class="code-line">  com.prot   &lt= req.prot;</code>
+<code class="code-line">  com.nse    &lt= req.nse;</code>
+<code class="code-line">  com.selx   &lt= req.selx;</code>
+<code class="code-line">  com.enable &lt= req.enable;</code>
+<code class="code-line">  com.write  &lt= req.write;</code>
+<code class="code-line">  com.wdata  &lt= req.wdata;</code>
+<code class="code-line">  com.strb   &lt= req.strb;</code>
+<code class="code-line">  com.auser  &lt= req.auser;</code>
+<code class="code-line">  com.wuser  &lt= req.wuser;</code>
+<code class="code-line"></code>
+<code class="code-line">  req.ready  &lt= com.ready;</code>
+<code class="code-line">  req.rdata  &lt= com.rdata;</code>
+<code class="code-line">  req.slverr &lt= com.slverr;</code>
+<code class="code-line">  req.ruser  &lt= com.ruser;</code>
+<code class="code-line">  req.buser  &lt= com.buser;</code>
+<code class="code-line"><b>end</b> <b>procedure</b>;</code>
 </pre>
 
 <p>
@@ -421,7 +421,7 @@ However, with the procedure workaround you:
   <li>Add one indirection layer.</li>
   <li>Make the description more verbose, and one of the goals of the mode view introduction was verbosity reduction.
   <li>You are not able to use this procedure for Crossbar. Why? Because in the case of the Crossbar, the connection is dynamic, and we are not passing static signal names. There is even an <a href="https://gitlab.com/IEEE-P1076/VHDL-Issues/-/issues/275">issue</a> about this in the IEEE VHDL issue tracker. For example, with the nvc simulator, I get the following error:
-<pre class="code-block">
+<div class="code"><pre>
 ** Error: actual associated with signal parameter REQ must be denoted
           by a static signal name
      > /home/mkru/workspace/vhdl/vhdl-amba5/apb/crossbar.vhd:183
@@ -431,14 +431,14 @@ However, with the procedure workaround you:
      |
      = Note: the --relaxed option downgrades this to a warning
      = Help: IEEE Std 1076-2008 section 4.2.2.3 "Signal parameters"
-     = Help: IEEE Std 1076-2019 section 8.1 "Names"</pre>
-  We need a procedure with the following signature:
+     = Help: IEEE Std 1076-2019 section 8.1 "Names"</pre></div>
+We need a procedure with the following signature:
 <pre class="code-block VHDL">
-procedure assign (
-  signal req : view (completer_view) of interface_array_t;
-  r : natural;
-  signal com : view requester_view
-);
+<code class="code-line"><b>procedure</b> assign (</code>
+<code class="code-line">  <b>signal</b> req : view (completer_view) <b>of</b> interface_array_t;</code>
+<code class="code-line">  r : <b>natural</b>;</code>
+<code class="code-line">  <b>signal</b> com : view requester_view</code>
+<code class="code-line">);</code>
 </pre>
   We end up with two procedures.
   One for entities utilizing view modes and one for entities utilizing view mode arrays.
@@ -452,8 +452,8 @@ In the traditional pre-VHDL 2019 approach, we are free of the above drawbacks as
 </p>
 
 <pre class="code-block VHDL">
-completers_in_o(c) <= requesters_out_i(r);
-requesters_in_o(r) <= completers_out_i(c);
+<code class="code-line">completers_in_o(c) &lt= requesters_out_i(r);</code>
+<code class="code-line">requesters_in_o(r) &lt= completers_out_i(c);</code>
 </pre>
 
 <p>

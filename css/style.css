@@ -121,6 +121,11 @@ code {
   font-size: 16px;
 }
 
+.code {
+  background-color: WhiteSmoke;
+  font-size: 14px;
+}
+
 .code-block {
   background-color: WhiteSmoke;
 }
