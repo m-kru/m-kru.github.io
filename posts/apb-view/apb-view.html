@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../../about.html">About</a>
+  | <a href="../../contact.html">Contact</a>
+  | <a href="../../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>12 Mar, 2024</time><br>
+<h1>Thoughts after implementing APB library using VHDL mode view</h1>
+
+<div class="tldr">
+<p style="margin-top:0px">
+<b>TLDR</b><br>
+<ol>
+  <li>The APB is a simple and well-designed on-chip bus.</li>
+  <li>The mode view mechanism introduced in the VHDL 2019 revision allows writing more concise descriptions. However, there are some corner cases when library maintainers might actually have to write more description than in the case when they use the traditional two-record approach. Such a case might happen during subelement signal assignments between two signals declared using mode view.</li>
+  <li>The advantages brought by the mode view are outweighed by the disadvantages. The main blocker for the VHDL 2019 mode view adoption is the lack of support in EDA tools.</li>
+</ol>
+</p>
+</div>
+
+<p>
+For a very long time, I have wanted a decent VHDL library for a simple on-chip bus.
+By a <i>decent</i> VHDL bus library, I mean a VHDL bus library which:
+<ol>
+  <li>Contains useful type declarations with interface signals, bus states, etc.</li>
+  <li>Contains at least one MxN Crossbar.
+  <li>Contains at least one <a href="https://en.wikipedia.org/wiki/Clock_domain_crossing">CDC</a> (Clock Domain Crossing) module.
+  <li>Contains at least one synthesizable Checker that I can use both in simulations and in the hardware.</li>
+  <li>Contains <a href="https://en.wikipedia.org/wiki/Bus_functional_model">BFM</a> (Bus Functional Model), so that I can write testbenches without depending on external libraries.</li>
+</ol>
+</p>
+
+<p>
+At first, I got the idea that I would design and implement my custom on-chip bus.
+However, I quickly gave up on this idea.
+Why?
+Well, I think we all know the <a href="https://xkcd.com/927/">competing standard</a> xkcd strip.
+Too much choice in the infrastructure components often leads to unnecessary waste of time as additional glue modules must be implemented.
+Those modules are frequently implemented ad-hoc and have questionable quality.
+I know because I have seen and used multiple of them.
+As I want to constantly improve the quality of what I utilize, I have decided to review existing on-chip buses and choose one.
+</p>
+
+<p>
+The first thing that struck me was that almost no open-source VHDL libraries provide on-chip buses.
+If you are a SystemVerilog guy, you can easily find a few by simply googling, for example, <a href="https://github.com/pulp-platform/axi">pulp-platform/axi</a>.
+The best VHDL bus library I have found is the one that provides the <a href="https://ohwr.org/project/general-cores/tree/master/modules/wishbone">Wishbone</a> bus, which is part of the <a href="https://ohwr.org/project/general-cores">general-cores</a> library.
+From my point of view, this library does not provide two important modules, a Checker and a BFM.
+On the other hand, it provides modules that, in my humble opinion, should not be a part of any bus library.
+For example, a PWM (Pulse-Width Modulator) or timer.
+I prefer when peripherals are part of a separate library and are only attached to a particular bus in the design.
+Such an approach helps to keep a bus library concise and makes peripherals more reusable.
+</p>
+
+<p>
+My review confirmed that two bus types are much more prevalent in the FPGA domain than all others, namely <a href="https://cdn.opencores.org/downloads/wbspec_b4.pdf">Wishbone</a> and <a href="https://developer.arm.com/documentation/ihi0022/latest/">AXI</a>.
+I have been a Wishbone user for a few years, so my first idea was to implement a library for Wishbone.
+However, the more complex things I was doing, the more I was leaning towards the opinion that Wishbone is not a good specification.
+Explaining why I am moving away from using Wishbone is not the goal of this post, but it is a good topic for another one, so if I find some free time, I hope to provide some arguments.
+</p>
+
+<p>
+My second idea was to implement a library for AXI.
+However, AXI is a really complex bus with multiple functionalities.
+AXI is probably the best choice for high-demanding systems.
+However, my experience is that in most electronic systems much more simpler bus can do the job.
+I also wanted my first bus library to be simple because I wanted to finish the implementation in a "finite time".
+I am aware of AXILite, but this is still AXI just simplified.
+</p>
+
+<p>
+As I was aware that AXI is just one of the specifications that are part of the <a href="https://www.arm.com/architecture/system-architectures/amba/amba-specifications">AMBA</a> (Advanced Microcontroller Bus Architecture), I have decided to get to know the others.
+When I found out APB, I thought this was exactly what I needed.
+The second argument in favor of APB is that it is already a member of AMBA family specifications.
+Those specifications are:
+<ol>
+  <li>Open standard and royalty free. However, be careful, as License Clause 2(i) states:</li>
+    <div class="quote"> <p>
+    where a product created under Clause 1(i) is an integrated circuit which includes a CPU then either: (a) such
+    CPU shall only be manufactured under licence from Arm; or (b) such CPU is neither substantially compliant
+    with nor marketed as being compliant with the Arm instruction sets licensed by Arm from time to time;
+    </p> </div>
+  <li>Omnipresent, especially in the FPGA domain. I have never been involved in any ASIC design, but I guess they are also frequently used in the ASIC domain. For sure, ARM uses them. Omnipresence also means that some vendors already provide read-to-use cores. For example, AMD for free provides an AXI-APB bridge that you can get with a few mouse clicks in the IP Wizard.</li>
+</ol> 
+</p>
+
+<p>
+The remaining content of the post consists of two parts.
+The first contains APB thoughts, and the second contains VHDL mode view thoughts.
+</p>
+
+<h2>APB thoughts</h2>
+
+<p>
+The APB stands for <i>Advanced Peripheral Bus</i>.
+The APB was introduced in 1997, and maybe it was advanced back then.
+Nowadays, compared to, for example, AXI, it is rather trivial.
+But don't get me wrong, correctly implementing APB logic is still not simple.
+</p>
+
+<p>
+In AMBA 5, Arm changed the terminology.
+What used to be called a "Master" in the APB is now called a "Requester", and what used to be called a "Slave" is now called a "Completer".
+It is also interesting to mention that Arm also changed the terminology for AXI.
+However, in the case of AXI, what used to be called a "Master" is now called a "Manager", and what used to be called a "Slave" is now called "Subordinate".
+I think the terminology change was more appropriate in the case of APB.
+In the case of AXI, they simply replaced old slavery terminology with modern corporate 21st-century slavery terminology.
+The "Requester" and "Completer" also have the same number of letters, which often leads to natural text alignment.
+This is not true for the "Manager" and "Subordinate".
+</p>
+
+The APB was designed for low bandwidth control access, such as register interfaces on system peripherals.
+But what does the low bandwidth mean?
+Estimating maximum APB bandwidth is relatively easy.
+The maximum APB data width is 32 bits.
+To transfer a single word in a block transaction, APB requires a minimum of 2 clock cycles.
+Answering the question of what is the maximum APB clock frequency is not an easy task, as it depends on multiple factors, for example, design size or number of modules connected to the bus.
+However, for simplicity, let's assume our APB bus frequency is 100 MHz (I believe in a well-implemented design, 200 MHz is achievable).
+In our case, the maximum theoretical APB bandwidth equals:
+</p>
+<div class="math"><p>
+32 bits * 100 MHz / 2 = 1600 Mb/s = 200 MB/s
+</p></div>
+<p>
+A practical maximum bandwidth is, of course, a little bit lower due to various reasons.
+For example:
+<ul>
+  <li>The first transfer in a block transaction requires 3 clock cycle.</li>
+  <li>A Completer might not always be ready.</li>
+  <li>Not all transactions are block transactions.</li>
+  <li>The bus fabric might include Crossbars requiring extra clock cycles to connect Requesters and Completers.</li>
+</ul>
+Let's assume (with a big pessimistic margin) that the "<i>user usable bandwidth</i>" equals 50 % of the maximum theoretical bandwidth.
+The 100 MB/s is still much more than needed for control, monitoring, and diagnostic purposes.
+It is even more than you need for a data path in some embedded systems.
+However, this is much less than required in any algorithm acceleration or high-performance computing system.
+</p>
+
+<p>
+The biggest drawback of the APB is probably its half-duplex nature.
+You can't read and write at the same time.
+If you directly connect APB to the CPU, it will limit your CPU performance as RAM access takes much longer than 2 or 3 clock cycles.
+Moreover, a compiler will not be able to optimize memory accesses fully.
+It will be able to reshuffle access order, but it won't be able to read data for the next operation while writing the result of the previous operation.
+I think, that was the main reason the AHB (Advanced High-performance Bus) was introduced in 1999.
+</p>
+
+<p>
+The most significant advantage of the APB is its simplicity.
+Revision 5 from 2023 has only 48 pages, including all non-technical information.
+Not only is the specification simple, but also the logic one has to describe to get the bus to operate correctly.
+If you assume your Requesters and Completers are bugs-free, then you can simply discard the <b>PENABLE</b> signal during the transaction entry condition check.
+This, in turn, potentially leads to shorter critical paths and higher bus clock frequency.
+</p>
+
+<p>
+The APB specification contains the diagram presenting the operating states of the APB interface.
+You can see the diagram in the below picture.
+</p>
+
+<img src="state-diagram.png" alt="APB interface state diagram" class="center">
+
+<p>
+Be careful when you read the specification and analyze the diagram.
+It presents state changes for a Requester, but the specification does not mention this.
+A Checker or Completer might use the same states.
+However, the edges for transitions are different.
+What is more, in my humble opinion, the text for three edges is incorrect:
+<ol>
+  <li>The edge from the IDLE to the SETUP should be named "Transaction" instead of "Transfer".</li>
+  <li>The edge from the IDLE to the IDLE should be named "No transaction" instead of "No Transfer".</li>
+  <li>The edge from the SETUP to the ACESS should be named "Transfer" instead of "" (no text).</li>
+</ol>
+</p>
+
+<h2>VHDL mode view thoughts</h2>
+
+<p>
+Mode view is the mechanism introduced in VHDL revision 2019.
+Some people call this mechanism the "interface" as a similar mechanism available in SystemVerilog is called the "interface".
+In my humble opinion, using the term "interface" is inappropriate for two reasons:
+<ol>
+  <li>If authors of the LRM (Language Reference Manual) wanted users to use the term "interfaces" instead of "mode view", they would simply name the language feature "interface", not "mode view".</li>
+  <li>The term "interface" was already used in the LRM, and an interface is much more than a view mode.
+
+  <div class="quote"><p> <pre>
+An interface declaration is an interface object declaration, an interface
+type declaration, an interface subprogram declaration, or an interface
+package declaration.
+
+interface_declaration ::=
+  interface_object_declaration
+  | interface_type_declaration
+  | interface_subprogram_declaration
+  | interface_package_declaration<pre></p></div>
+</li>
+</ol>
+</p>
+
+<p>
+Long story short, the mode view allows each subelement of the composite to have a different mode.
+People often use the term "direction" instead of the "mode".
+However, this is incorrect.
+Have a look at the following two definitions from the LRM:
+  <div class="quote"><p> <pre>
+direction ::= <b>to</b> | <b>downto</b>
+mode ::= <b>in</b> | <b>out</b> | <b>inout</b> | <b>buffer</b> | <b>linkage</b></pre></p></div>
+</p>
+
+<p>
+The snippet below presents an example of mode view indication for a record type.
+I have used the name "interface_t" for the record type because it is the word used in the APB specification.
+However, this record is not an interface from the VHDL point of view.
+</p>
+
+<pre class="code-block VHDL">
+-- Mode view approach
+
+type interface_t is record
+  addr   : unsigned(31 downto 0);
+  prot   : protection_t;
+  nse    : std_logic;
+  selx   : std_logic;
+  enable : std_logic;
+  write  : std_logic;
+  wdata  : std_logic_vector(31 downto 0);
+  strb   : std_logic_vector( 3 downto 0);
+  ready  : std_logic;
+  rdata  : std_logic_vector(31 downto 0);
+  slverr : std_logic;
+  wakeup : std_logic;
+  auser  : std_logic_vector(127 downto 0);
+  wuser  : std_logic_vector( 15 downto 0);
+  ruser  : std_logic_vector( 15 downto 0);
+  buser  : std_logic_vector( 15 downto 0);
+end record;
+
+type interface_array_t is array (natural range <>) of interface_t;
+
+view requester_view of interface_t is
+  addr : out; prot : out; nse : out; selx : out;
+  enable : out; write : out; wdata : out; strb : out;
+  ready : in; rdata : in; slverr : in;
+  wakeup : out; auser : out; wuser : out;
+  ruser : in; buser  : in;
+end view;
+
+alias completer_view is requester_view'converse;
+</pre>
+
+<p>
+The below snippet presents how the same is usually achieved in the pre-VHDL 2019 revision.
+</p>
+
+<pre class="code-block VHDL">
+-- Two record approach
+
+type requester_out_t is record
+  addr   : unsigned(31 downto 0);
+  prot   : protection_t;
+  nse    : std_logic;
+  selx   : std_logic;
+  enable : std_logic;
+  write  : std_logic;
+  wdata  : std_logic_vector(31 downto 0);
+  strb   : std_logic_vector( 3 downto 0);
+  wakeup : std_logic;
+  auser  : std_logic_vector(127 downto 0);
+  wuser  : std_logic_vector( 15 downto 0);
+end record;
+
+type requester_in_t is record
+  ready  : std_logic;
+  rdata  : std_logic_vector(31 downto 0);
+  slverr : std_logic;
+  ruser  : std_logic_vector( 15 downto 0);
+  buser  : std_logic_vector( 15 downto 0);
+end record;
+
+type requester_out_array_t is array (natural range <>) of requester_out_t;
+type requester_in_array_t  is array (natural range <>) of requester_in_t;
+
+subtype completer_in_t  is requester_out_t;
+subtype completer_out_t is requester_in_t;
+
+type completer_out_array_t is array (natural range <>) of completer_out_t;
+type completer_in_array_t  is array (natural range <>) of completer_in_t;
+</pre>
+
+<p>
+Now, let's look at an example entity interface utilizing mode views.
+The below snippet presents the interface of a Crossbar.
+I have chosen a Crossbar because it will allow me to show some inconvenience of using mode views.
+<p>
+
+<pre class="code-block VHDL">
+entity Crossbar is
+  generic (
+    REQUESTER_COUNT : positive := 1;
+    COMPLETER_COUNT : positive := 1;
+    ADDRS  : addr_array_t(0 to COMPLETER_COUNT - 1); -- Completer addresses 
+    MASKS  : mask_array_t(0 to COMPLETER_COUNT - 1)  -- Completer address masks
+  );
+  port (
+    arstn_i : in std_logic := '1';
+    clk_i   : in std_logic;
+    requesters : view (completer_view) of interface_array_t(0 to REQUESTER_COUNT - 1);
+    completers : view (requester_view) of interface_array_t(0 to COMPLETER_COUNT - 1)
+  );
+end entity;
+</pre>
+
+<p>
+The below snippet presents how the same is usually achieved in the pre-VHDL 2019 revision.
+</p>
+
+<pre class="code-block VHDL">
+entity Crossbar is
+  generic (
+    REQUESTER_COUNT : positive := 1;
+    COMPLETER_COUNT : positive := 1;
+    ADDRS  : addr_array_t(0 to COMPLETER_COUNT - 1); -- Completer addresses 
+    MASKS  : mask_array_t(0 to COMPLETER_COUNT - 1)  -- Completer address masks
+  );
+  port (
+    arstn_i : in std_logic := '1';
+    clk_i   : in std_logic;
+    requesters_out_i : in  requester_out_array_t(0 to REQUESTER_COUNT - 1);
+    requesters_in_o  : out requester_in_array_t(0 to REQUESTER_COUNT - 1);
+    completers_in_o  : in  completer_in_array_t(0 to COMPLETER_COUNT - 1);
+    completers_out_i : out compleyer_out_array_t(0 to COMPLETER_COUNT - 1)
+  );
+end entity;
+</pre>
+
+<p>
+The number of ports required for the bus signals is doubled compared to the mode view approach.
+So is the number of bus signals declared in various architectures where bus signal routing is required.
+This was actually one of the goals of the mode view introduction - reduction of required signal declarations.
+The second one was probably increased readability and maintainability, although I doubt whether the mode view mechanism provides them.
+</p>
+
+<p>
+Now, I would like to present some drawbacks I have encountered while using mode views.
+The Crossbar is a perfect case here, as the goal of the Crossbar is to connect a given Requester with a Completer addressed by this Requester.
+As the mode view should be used to represent module interfaces, there is a natural desire to directly assign port signals declared using mode views to each other.
+For example, something like this:
+</p>
+
+<pre class="code-block VHDL">
+completers(c) <= requesters(r);
+requesters(r) <= completers(c);
+</pre>
+
+<p>
+However, you can't do this if your target signal has a mode view indication with at least one subelement declared as in.
+You have to do it one by one for each out subelement, or you will get an error.
+For example, with the <a href="https://github.com/nickg/nvc">nvc</a> simulator, I get the following error:
+</p>
+
+<pre class="code-block">
+** Error: cannot assign to port COMPLETERS with mode view indication as one or more
+          sub-elements have mode IN
+     > /home/mkru/workspace/vhdl/vhdl-amba5/apb/crossbar.vhd:174
+     |
+ 174 |           completers(c) <= requesters(r);
+     |           ^^^^^^^^^^^^^ target of signal assignment
+     |
+     = Note: element READY declared with mode IN
+</pre>
+
+<p>
+Of course, you can come around this inconvenience by defining a procedure for subelement assignments between two signals with given mode views.
+For example, something like this:
+</p>
+
+<pre class="code-block VHDL">
+procedure assign (
+  signal req : view completer_view; signal com : view requester_view
+) is
+begin
+  com.addr   <= req.addr;
+  com.prot   <= req.prot;
+  com.nse    <= req.nse;
+  com.selx   <= req.selx;
+  com.enable <= req.enable;
+  com.write  <= req.write;
+  com.wdata  <= req.wdata;
+  com.strb   <= req.strb;
+  com.auser  <= req.auser;
+  com.wuser  <= req.wuser;
+
+  req.ready  <= com.ready;
+  req.rdata  <= com.rdata;
+  req.slverr <= com.slverr;
+  req.ruser  <= com.ruser;
+  req.buser  <= com.buser;
+end procedure;
+</pre>
+
+<p>
+However, with the procedure workaround you:
+<ol>
+  <li>Add one indirection layer.</li>
+  <li>Make the description more verbose, and one of the goals of the mode view introduction was verbosity reduction.
+  <li>You are not able to use this procedure for Crossbar. Why? Because in the case of the Crossbar, the connection is dynamic, and we are not passing static signal names. There is even an <a href="https://gitlab.com/IEEE-P1076/VHDL-Issues/-/issues/275">issue</a> about this in the IEEE VHDL issue tracker. For example, with the nvc simulator, I get the following error:
+<pre class="code-block">
+** Error: actual associated with signal parameter REQ must be denoted
+          by a static signal name
+     > /home/mkru/workspace/vhdl/vhdl-amba5/apb/crossbar.vhd:183
+     |
+ 183 |             assign(requesters(r), completers(c));
+     |                    ^^^^^^^^^^^^^ not a static signal name
+     |
+     = Note: the --relaxed option downgrades this to a warning
+     = Help: IEEE Std 1076-2008 section 4.2.2.3 "Signal parameters"
+     = Help: IEEE Std 1076-2019 section 8.1 "Names"</pre>
+  We need a procedure with the following signature:
+<pre class="code-block VHDL">
+procedure assign (
+  signal req : view (completer_view) of interface_array_t;
+  r : natural;
+  signal com : view requester_view
+);
+</pre>
+  We end up with two procedures.
+  One for entities utilizing view modes and one for entities utilizing view mode arrays.
+  Even more verbosity.
+  </li>
+</ol>
+</p>
+
+<p>
+In the traditional pre-VHDL 2019 approach, we are free of the above drawbacks as we can simply do the following:
+</p>
+
+<pre class="code-block VHDL">
+completers_in_o(c) <= requesters_out_i(r);
+requesters_in_o(r) <= completers_out_i(c);
+</pre>
+
+<p>
+Nevertheless, I would probably still use the mode view approach regardless of the inconveniences, as these are rather library maintainer inconveniences, not library users.
+However, there is one thing that is VHDL mode view killer, and I describe it in the following section.
+</p>
+
+<h3>VHDL mode view killer</h3>
+
+<p>
+The VHDL mode view killer is ... *BA DUM TSSS* ... lack of support.
+What a surprise.
+In the case of the simulators, the situation is not so bad.
+Free and open-source nvc supports view mode.
+Commercial and proprietary Aldec Riviera Pro also supports mode view.
+However, mode view is not a mechanism that makes a difference in a simulation.
+It is a mechanism that makes a difference in synthesis.
+</p>
+
+<p>
+The below table summarizes VHDL 2019 mode view support.
+It includes only FGPA EDA tools.
+I am unfamiliar with ASIC EDA tools and have no access to them.
+I am leaving the fact that Intel supports mode view, but it is behind the paywall in the Pro edition without a comment.
+There is also Achronix utilizing Synplify-Pro for synthesis and QuickLogic utilizing Mentor Graphics tools for synthesis.
+As both use external ASIC tools for synthesis, I don't know whether they support the VHDL 2019 mode view.
+</p>
+
+<table>
+  <tr>
+    <th>EDA Tool</th>
+    <th>Mode View Support</th>
+    <th>Mode View Array Support</th>
+  </tr>
+  <tr>
+    <td>AMD Vivado</td>
+    <td>Yes</td>
+    <td>Not sure</td>
+  </tr>
+  <tr>
+    <td>Intel Quartus Prime Pro</td>
+    <td>Yes</td>
+    <td>Not sure</td>
+  </tr>
+  <tr>
+    <td>Intel Quartus Prime Standard/Lite</td>
+    <td>No</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>Lattice Diamond</td>
+    <td>No</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>Microchip Libero</td>
+    <td>No</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>GOWIN EDA</td>
+    <td>No</td>
+    <td>No</td>
+  </tr>
+  <tr>
+    <td>Efinix Efinity</td>
+    <td>No</td>
+    <td>No</td>
+  </tr>
+</table>
+
+<p>
+By the way, my VHDL APB library is available <a href="https://github.com/m-kru/vhdl-amba5">here</a>.
+It is not yet ready, as I have to rewrite it from the mode view approach to the two-records approach.
+</p>
+
+</body>
+
+</html>
