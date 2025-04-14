@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../about.html">About</a>
+  | <a href="../contact.html">Contact</a>
+  | <a href="../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>14 Apr, 2025</time><br>
+<h1>First impression on GOWIN FPGA and GOWIN IDE</h1>
+
+<div class="tldr">
+<p style="margin-top:0px">
+<b>TLDR</b><br>
+</p>
+
+<p style="margin-top:0px">
+GOWIN FPGAs seem to be very cheap and decent alternatives for FPGAs from other vendors.
+However, the number of available logic resources is relatively small, so GOWIN FPGAs are most suitable for small to medium size projects.
+</p>
+
+<p style="margin-top:0px">
+GOWIN IDE is implemented in Qt, is shipped with the required version of libraries, works fast, and using it feels pretty easy and natural.
+</p>
+</div>
+
+<p>
+Last weekend, I added support for GOWIN EDA to the <a href="https://github.com/m-kru/hbs">Hardware Build System</a> I implemented.
+By the way, you should really try this build system if you haven't yet.
+I had so much fun that I finally decided to write a blog post.
+</p>
+
+<p>
+This post is not about the cool stuff you can do with GOWIN FPGAs.
+It is also not about what you can find inside GOWIN FPGAs.
+It is rather about what you need to know before starting with GOWIN FPGAs.
+</p>
+
+<h2>GOWIN</h2>
+
+GOWIN, to be more precise, Gowin Semiconductor, is a Chinese FPGA vendor.
+This is, in my humble opinion, good news.
+The FPGA vendor world is largely dominated by companies from the USA.
+Saying that the USA has a monopoly on FPGA is not exaggerated.
+There are some minor vendors in Europe and Asia, but their capital is usually somehow connected with capital from the USA anyway.
+Moreover, the computing power they offer is not even close to what can be achieved with the biggest chips from AMD (former Xilinx) or Altera (former Intel, former Altera).
+Having some company questioning the status quo is always good for customers.
+
+<h2>GOWIN FPGAs</h2>
+
+GOWIN basically has two FPGA families, the Arora and LittleBee.
+I am just going to quote what GOWIN says about both families.
+
+<div class="quote">
+<p>
+Arora V series of FPGA Products are the second-generation of Arora family, with abundant internal resources, a new-architecture and high-performance DSP supporting AI operations, high-speed LVDS interfaces, and abundant BSRAM resources.
+Showcasing advanced 22nm SRAM technology and integrating 270Mbps-12.5Gbps high speed SerDes interfaces, PCIe 2.1 hard core with support for PCIe x1, x2, x8 modes, along with MIPI hard core single lane module at up to 2.5Gbps, and DDR3 interfacing at speeds up to 1333 Mbps.
+The first family device, GW5AT-138FC676, features 138K LUT logic resources, 6.4MB block RAM, 1.1MB distributed SRAM, along with advanced DSP blocks, and integrated ADC.
+Future family devices include 25K (non-Serdes) and 60K LUT devices.
+</p>
+</div>
+
+<!-- Empty paragraph to enforce vertical space between quotes. -->
+<p></p>
+
+<div class="quote">
+<p>
+GOWIN’s LittleBee® family offers flash based non-volatile FPGAs that are low power and offer small packaging footprints (as small as 2.4x2.3mm).
+As a result, LittleBee FPGAs are leading the industry in I/O intensive source synchronous interfacing and bridging applications such as MIPI CSI-2, MIPI DSI, USB 2.0, Ethernet, HDMI, MIPI I3C and more.
+They are also an ideal candidate for hardware management applications offering instant-on booting and built-in security functions.
+</p>
+<p>
+The LittleBee® FPGA family is complimented by multiple innovative product line sub-features such as extended memory, hardened ARM Cortex-M processor cores, security and Bluetooth LE expanding its capabilities and usage compared to traditional FPGA products.
+</p>
+</div>
+
+<p>
+What are some practical conclusions from what GOWIN says about their FPGA families?
+<ol>
+<li>Arora family is for medium size projects.</li>
+<li>Arora has 12.5 Gbps capable SerDes, so you can run 10 Gbps Ethernet.</li>
+<li>LittleBee is for small size projects.</li>
+<li>GOWIN probably targets video processing systems. They brag about MIPI and HDMI interfaces almost everywhere.</li>
+</ol></p>
+</p>
+
+<p>
+The smallest LittleBee device has only 1152 LUTs.
+GOWIN LUTs are LUT4.
+Taking these two facts together, I was thinking about what you can do with such a low resource device.
+Probably, some low-latency deterministic safety system or small hardware management subsystem.
+I implemented 1 second LED blinker with a 20 MHz clock.
+It consumed 34 out of 1152 resources (~ 2.95%).
+</p>
+
+<p>
+The biggest LittleBee device offers 8640 LUTs.
+What is nice is that some LittleBee devices come with the Cortex-M3 core.
+In such a case, you can easily implement small-medium size projects.
+The FPGA fabric, in this case, serves as "whatever peripheral you want."
+Moreover, GOWIN claims you can run FreeRTOS and uC/OS-III real-time operating systems on this devices out of the box.
+</p>
+
+<p>
+GOWIN also offers 32-bit RISCV based SoC (Gowin RiscV_AE350_SOC).
+The SoC has <a href="https://www.andestech.com/en/products-solutions/andescore-processors/riscv-a25/">AndesCore™ A25</a> hardware core from Andes Technology.
+Theoretically, the core has MMU and is capable of running Linux.
+In practice, you can't run Linux.
+The documentation of the core and its MMU is not publicly avaiable, so no one has ported Linux to it.
+Andes Technology has access to the documentation, so they could port Linux, but they didn't \_(ツ)_/¯ (or they did and don't want to make it public).
+This is a huge drawback.
+You can only write bare metal or try using some real-time operating system.
+</p>
+
+<p>
+The greatest advantage of GOWIN FPGAs is the price/capabilities ratio.
+You just can't find any FPGAs offering similar computing power for the same price as GOWIN FPGAs.
+The price of GOWIN development boards is also really low.
+They are a good choice if you just start with FPGAs.
+</p>
+
+<p>
+I have heard that one problem with GOWIN is that you have to purchase devices in large batches.
+However, as I didn't buy bare devices, I was not able to verify this.
+It also looks like GOWIN makes only direct sales via regional distributors.
+</p>
+
+<h2>GOWIN IDE</h2>
+
+<p>
+GOWIN IDE is GOWIN's EDA tool (in fact, this is a bunch of tools).
+You have to use it to carry out the synthesis and implementation process.
+Actually, you can also use Yosys, but I didn't try, and I doubt it supports all GOWIN devices.
+</p>
+
+<p>
+The installation on Linux is rather simple (you can also install on Windows, but why would you do so).
+You have to register, download the archive, and untar it.
+I downloaded version 1.9.11.01, and after untar it occupies 2.9 GB.
+I don't like the fact that you have to provide your phone number during registration.
+Why do they need my phone number?
+Are they going to call me on weekends?
+Although my Ubuntu version (22.04) is not on the list of supported Ubuntu versions (the highest is 20.04), I had only minor problems starting the application.
+This is because someone at GOWIN keeps their feet on the ground.
+The IDE is implemented using Qt (not Java, like most EDA tools) and is shipped with a directory (<code>lib</code>) containing required versions of shared libraries.
+Of course, I did have problems with the version of libraries on my system.
+However, to solve them, I just had to export the library path before starting the program.
+</p>
+
+<pre class="code-block">
+export LD_LIBRARY_PATH=/tools/gowin/"$version"/IDE/lib:$LD_LIBRARY_PATH
+</pre>
+
+<p>
+GOWIN, by default, tries to use hardware rendering for graphics.
+I also encountered a problem with this.
+However, solving it was easy (again).
+I just had to enforce software rendering for libgl by setting the following variable:
+</p>
+
+<pre class="code-block">
+LIBGL_ALWAYS_SOFTWARE=1
+</pre>
+
+<p>
+After solving the problems, I was able to start the GOWIN IDE.
+It comes with some example projects, so I immediately opened one of them, the <code>vga_text_generator</code>.
+I just wanted to check how long it will take to synthesize and implement the project.
+This example project is rather small.
+The synthesis plus implementation (together) took around 3 or 4 seconds.
+Vivado for projects of the same scale takes the same amount of time to just render information that it is starting synthesis ...
+</p>
+
+<p>
+One thing to note is that GOWIN IDE has no separate stage for bitstream generation.
+Bitstream generation is a part of the implementation stage.
+The default bitstream file extension is <code>.fs</code>, but it also supports <code>.bin</code> and <code>.xbin</code> formats.
+</p>
+
+<p>
+My first experience with GOWIN IDE is great.
+It feels like it just does what it is supposed to do.
+It is fast and does not come into my way.
+Solving problems was easy.
+I feel like the whole GOWIN software stack was designed by someone who shares the same value as I do, the simplicity.
+</p>
+
+<p>
+I hope one day I will be able to implement some larger project on GOWIN FPGAs.
+I would like to see how their place and route solver handles designs with resource utilization greater than 90%.
+</p>
+
+</body>
+
+</html>
