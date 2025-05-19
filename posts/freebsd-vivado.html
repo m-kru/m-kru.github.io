@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../about.html">About</a>
+  | <a href="../contact.html">Contact</a>
+  | <a href="../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>19 May, 2025</time><br>
+<h1>FreeBSD: Running Vivado on FreeBSD</h1>
+
+<p>
+For a very long time (like 4 or 5 years), I have been considering ditching Linux-based OSes in favor of FreeBSD.
+There are multiple reasons to do so.
+Just to name a few:
+<ul>
+  <li>
+    Linux-based OSes are not orthogonal.
+    Multiple init systems, various ways to configure the same things differently.
+    I have been a Linux desktop and server user for more than 10 years.
+    However, when I configure and use Linux based distro with Buildroot, I feel like a newbie.
+    The Linux knowledge is not portable, because everything is done in a "different way" depending on the platform you target.
+    Some say that this is because embedded applications are different than, for example, server applications.
+    This is just thier opinion.
+    My opinion is that there is no reason for such a state to be, and Linux environment is just a mess.
+  </li>
+  <li>
+    Omnipresent bloat.
+    Linux is becoming more like Windows and less like *nix.
+  </li>
+  <li>
+    Linux is not governed by the community anymore.
+    It is governed by Big Tech, and Big Tech cares only about money.
+  </li>
+</ul>However, this post is not about why I think FreeBSD is much better than Linux, so I am not going to discuss it here.
+</p>
+
+<p>
+The only thing stopping me so far from switching entirely to FreeBSD was the fact that I work with FPGAs.
+None of the FPGA vendors officially supports FreeBSD.
+Without being able to run at least Vivado, I am not able to pay my bills.
+Unless I change my profession, which I sometimes think of because there are multiple IT things easier to do than FPGA development, where you get much more money.
+</p>
+
+<p>
+In this post, I am just going to list theoretical ways of running Vivado on FreeBSD.
+Each of these ways (except the first one) is going to be described in a separate post.
+</p>
+
+<p>
+I can think of the following 4 possible ways of running Vivado on FreeBSD.
+<ol>
+  <li>
+    <b>Linuxulator without chroot.</b>
+    I tried this method a couple of years ago.
+    I was not able to run the GUI because of some Java errors.
+    I failed in overcoming those errors, and I finally gave up.
+    However, even if it was possible to run GUI, I would not recommend this way.
+    Without chroot, you might encounter some subtle library and user space program differences that might crash Vivado in unexpected cases.
+    Moreover, without chroot, you get no filesystem separation.
+    Vivado can easily scan all files on your machine.
+  </li>
+  <li>
+    <b>Linuxulator with chroot.</b>
+    I have tried this method recently, and it works!
+    I am going to describe it soon.
+    With chroot, you get filesystem separation, but no network or process separation.
+    Moreover, although you can synthesize designs generate bitstreams, etc., you can't program your devices as AMD drivers are not available for FreeBSD.
+  </li>
+  <li>
+    <b>Linux jail.</b>
+    Running Vivado in a Linux jail is almost the same as running Vivado with Linuxulator with chroot.
+    I haven't tried it yet.
+    However, as running Vivado with Linuxulator and chroot works, I expect running Vivado in a Linux jail also works.
+    Compared to chroot, a jail provides you with network and process separation.
+    The cost is a greater burden required to configure a jail.
+    This method also doesn't allow programming devices directly from the Vivado GUI.
+  </li>
+  <li>
+    <b>Linux in bhyve.</b>
+    I haven't tried this yet, but I am sure it works.
+    With bhyve, you basically run Linux.
+    You don't simply "pretend" you run Linux.
+    If you have a spare USB controller, you can even pass it to the virtual machine.
+    You should be able to program devices directly from the Vivado GUI.
+  </li>
+</ol>
+</p>
+
+<p>
+Using methods 2 (Linuxulator with chroot) and 3 (Linux jail) you can compile designs.
+However, you are not able to program devices.
+The good news is that there are decent solutions for this problem.
+I haven't tried them yet, but I am sure some of them work (1 and 2), and I will describe them in separate posts.
+<ol>
+<li>Running Vivado hw_server on Raspberry Pi and connecting to it via network.</li>
+<li>Running Vivado hw_server, or whole Vivado in virtual machine (bhyve).</li>
+<li>Using <a href="https://github.com/kholia/xvc-pico">xvc-pico</a>. I think no one has tried to run it on FreeBSD so far, so it might require additional tweaks.</li>
+<li>Using <a href="https://github.com/matrix-io/xc3sprog">xc3sprog</a>. I have never used it. I think it might require some tweaking to run on FreeBSD. I am also not sure whether all AMD FPGA devices can be programmed with it.</li>
+</ol>
+</p>
+
+</body>
+
+</html>
