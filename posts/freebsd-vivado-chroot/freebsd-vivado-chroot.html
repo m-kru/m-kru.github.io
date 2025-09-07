@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../../about.html">About</a>
+  | <a href="../../contact.html">Contact</a>
+  | <a href="../../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>7 Sep, 2025</time><br>
+<h1>FreeBSD: Running Vivado using chroot</h1>
+
+<p>
+In this post, I will describe how to run Vivado on FreeBSD using the <code>chroot</code> mechanism.
+</p>
+
+<p>
+I assume you already know how to install FreeBSD and your favourite desktop environment (or window manager).
+I also assume you know how to download a proper Vivado installer from the AMD website.
+</p>
+
+<p>
+Some of the commands presented in the post require root privileges.
+I intentionally avoid <code>doas</code> or <code>sudo</code> in some places for brevity.
+I use <code>doas</code> on FreeBSD and <code>sudo</code> on Ubuntu.
+This may give you extra hints on which commands are executed on which system.
+</p>
+
+<h2>Enable Linux compatibility</h2>
+
+This boils down to two actions:
+<ol>
+  <li>Add <code>linux_enable="YES"</code> line to your <i>/etc/rc.conf</i> file.</li>
+  <li>
+    Run <code>service linux start</code> as root to start the Linux compatibility service.
+    You can also reboot the system so that the service is started during the boot process.
+  </li>
+</ol>
+
+If everything goes ok, you should see some <code>linux*.ko</code> entries in <code>kldstat</code> output.
+
+<h2>Debootstrap Ubuntu system</h2>
+
+<p>
+FreeBSD has a dedicated utility for bootstrapping Debian/Ubuntu systems.
+The utility is called <code>debootstrap</code>.
+However, it is not installed with the base system.
+A user must explicitly install it with pkg.
+</p>
+
+<pre class="code-block">
+pkg instsall debootstrap
+</pre>
+
+<p>
+Based on the downloaded Vivado version, you must determine what Ubuntu releases are supported.
+I have downloaded Vivado 2025.1.
+Vivado 2025.1 supports Ubuntu 22.04 and 24.04.
+These versions are named Jammy and Noble, respectively.
+You can check which suites (releases) are supported by your debootstrap by running:
+</p>
+
+<pre class="code-block">
+ls /usr/local/share/debootstrap/scripts/
+</pre>
+
+<p>
+In my case, Ubuntu 24.04 (Noble) is not supported, but Ubuntu 22.04 (Jammy) is.
+Bootstrapping a usable Ubuntu requires four steps:
+<ol>
+  <li>
+    <b>Installing Ubuntu.</b>
+    To accomplish this task simply run:
+<pre class="code-block">
+debootstrap jammy /compat/ubuntu-22.04
+</pre>
+    How you name your directory is up to you.
+    Just remember to avoid <code>/compat/linux</code> to avoid a clash with CentOS-based ports and packages.
+    At this stage, you should already be able to <code>chroot /compat/ubuntu-22.04/</code>.
+    The <code>uname</code> command should simply return <code>Linux</code>.
+    However, hold your horses!
+    We need more.
+  </li>
+  <li>
+    <b>Setting up filesystem mounts for Linux.</b>
+    Add the following lines the the <i>/etc/fstab</i> file.
+<pre class="code-block">
+<code class="code-line">devfs       /compat/ubuntu-22.04/dev       devfs       rw,late                     0   0</code>
+<code class="code-line">tmpfs       /compat/ubuntu-22.04/dev/shm   tmpfs       rw,late,size=1g,mode=1777   0   0</code>
+<code class="code-line">fdescfs     /compat/ubuntu-22.04/dev/fd    fdescfs     rw,late,linrdlnk            0   0</code>
+<code class="code-line">linprocfs   /compat/ubuntu-22.04/proc      linprocfs   rw,late                     0   0</code>
+<code class="code-line">linsysfs    /compat/ubuntu-22.04/sys       linsysfs    rw,late                     0   0</code>
+<code class="code-line">/tmp        /compat/ubuntu-22.04/tmp       nullfs      rw,late                     0   0</code>
+<code class="code-line">/home       /compat/ubuntu-22.04/home      nullfs      rw,late                     0   0</code>
+</pre>
+    The <code>/tmp</code> and <code>/home</code> entries are required for sharing the home directory and being able to run X11 applications.
+    Run <code>mount -al</code> to apply the changes.
+  </li>
+  <li>
+    <b>Adding user with UID/GID matching the ones on the host system.</b>
+    Technically, the UID and GID don't have to match the ones on the host system.
+    However, when they match, it makes your life much easier.
+    Run the <code>id</code> command as a user on the FreeBSD host to get your UID and GID.
+    To add a user on Ubuntu, I simply chroot to it and execute the proper commands manually.
+    It is a one-time job.
+    When you add a user on Ubuntu, it is probably also a good idea to configure the shell to your favourite.
+    I prefer <code>bash</code>.
+  </li>
+  <li>
+    <b>Adding the package repositories missing from defaults.</b>
+    If you also install Ubuntu 22.04 (Jammy), then add the following lines to the <i>/compat/ubuntu-22.04/etc/apt/sources.list</i> file.
+<pre class="code-block">
+<code class="code-line">deb http://archive.ubuntu.com/ubuntu jammy main universe restricted multiverse</code>
+<code class="code-line">deb http://security.ubuntu.com/ubuntu/ jammy-security universe multiverse restricted main</code>
+<code class="code-line">deb http://archive.ubuntu.com/ubuntu jammy-backports universe multiverse restricted main</code>
+<code class="code-line">deb http://archive.ubuntu.com/ubuntu jammy-updates universe multiverse restricted main</code>
+</pre>
+    Run <code>sudo apt update</code> on Ubuntu to apply changes.
+  </li>
+</ol>
+</p>
+
+<h2>Install Vivado</h2>
+
+<p>
+By default, Java on Ubuntu chroot will crash because of missing libraries and packages.
+Run the following command on Ubuntu:
+</p>
+
+<pre class="code-block">
+sudo apt install libxext6 libxrender1 libxtst6 libxi6 \
+	fontconfig fonts-dejavu-core
+</pre>
+
+<p>
+Run the <code>xsetup</code> in the extracted Vivado installator directory.
+The installer will complain about unsupported OS.
+Even though we run in the Ubuntu 22.04 environment, and Vivado 2025.1 officially supports Ubuntu 22.04, the installer is able to detect that the OS is invalid.
+I wish AMD tools were that clever when I actually need them to be clever.
+</p>
+
+<p>
+Go through the Vivado installation process the same way you would normally do on a native Ubuntu host.
+At the end of the installation process, you will probably get a warning saying that the locate is not set.
+Run the following commands to update locale:
+</p>
+
+<pre class="code-block">
+sudo locale-gen en_US.UTF-8
+sudo update-locale
+</pre>
+
+<p>
+Try to run Vivado GUI by sourcing the <i>settings64.sh</i> script and executing the <code>vivado</code> command in the Ubuntu shell.
+At this stage, you would probably get the following error:
+</p>
+<div class="quote">
+<p>
+application-specific initialization failed: couldn't load file "libxv_commontasks.so": libtinfo.so.5: cannot open shared object file: No such file or directory
+</p>
+</div>
+
+<p>
+Don't worry, we can easily fix this.
+We just need to install libtinfo5.
+Run:
+</p>
+
+<pre class="code-block">
+sudo apt install libtinfo5
+</pre>
+
+<p>
+Run <code>vivado</code>.
+If you use standard desktop environments like Xfce, Gnome, or KDE, you should now see the Vivado welcome screen.
+However, if you use a bare window manager, for example, bspwm, you might see a white rectangle.
+Don't worry, we just need the following export for Java on Ubuntu.
+</p>
+
+<pre class="code-block">
+export _JAVA_AWT_WM_NONREPARENTING=1
+</pre>
+
+<p>
+Run <code>vivado</code> and you should see a beautiful image similar to the following one:
+</p>
+
+<img src="vivado.png" alt="Vivado GUI" class="center" width="820">
+
+<h2>I want more (running Vivado GUI like a normie)</h2>
+
+<p>
+At this point, to start Vivado GUI I have to:
+
+<ol>
+  <li><code>chroot</code> to Ubuntu,</li>
+  <li>switch user to my <code>$USER</code> in Ubuntu,</li>
+  <li>source Vivado <i>settings64.sh</i> script,</li>
+  <li>run <code>vivado</code> command.
+</ol>
+
+I don't consider myself a lazy person.
+However, I am too lazy to do all this each time I want to start Vivado.
+Can I streamline the above procedure?
+Let's try.
+</p>
+
+<p>
+My requirements are as follows:
+<ol>
+  <li>I don't want to create any security holes.</li>
+  <li>I don't want to provide any password to run Vivado GUI.</li>
+  <li>I want to be able to specify the version of Vivado I want to run.</li>
+  <li>I want to be able to start Vivado GUI using application launchers.</li>
+  <li>I want my solution to be flexible enough to start also programs like Vitis HLS or Vitis Analyzer.</li>
+  <li>If I ever have to switch back to Linux, I want to reuse most of the infrastructure.</li>
+</ol>
+That's quite a lot.
+However, we struggle for the best user experience.
+Why?
+</p>
+
+<div class="quote"> <p>
+<i>Because we can. Because we f**cking can ... and if we can, we do.</i><br>
+<br>
+Thomas "Tommy" Shelby
+</p></div>
+
+<p>
+I will start with the bottom-up approach.
+This means the first thing we need is a shell script for starting an arbitrary AMD tool with an arbitrary version on Linux system.
+I keep my custom AMD-related scripts in <i>~/data/dotfiles/amd/</i> directory.
+The script for running AMD GUI tools on Linux is called <i>run-gui-linux.sh</i>, and looks as follows:
+</p>
+
+<pre class="code-block">
+<code class="code-line">#!/usr/bin/env bash</code>
+<code class="code-line"></code>
+<code class="code-line"># Script for running AMD tools in GUI mode with working directory set to /tmp.</code>
+<code class="code-line">#</code>
+<code class="code-line"># Parameters:</code>
+<code class="code-line">#   $1 - tool name (vivado, vitis_hls, vitis_analyzer),</code>
+<code class="code-line">#   $2 - tool version (for example, 2021.2).</code>
+<code class="code-line">#</code>
+<code class="code-line"># In case of .desktop files add:</code>
+<code class="code-line">#   Exec=/path/to/script/run-gui.sh <tool> <version></code>
+<code class="code-line"></code>
+<code class="code-line"><b>set</b> -e</code>
+<code class="code-line"></code>
+<code class="code-line">tool=$1</code>
+<code class="code-line">version=$2</code>
+<code class="code-line"></code>
+<code class="code-line"># Java does not play well with window managers (DWM, Awesome, bspwm).</code>
+<code class="code-line"># https://wiki.archlinux.org/title/Xilinx_Vivado</code>
+<code class="code-line"><b>export</b> _JAVA_AWT_WM_NONREPARENTING=1</code>
+<code class="code-line"></code>
+<code class="code-line"># License, adjust if required.</code>
+<code class="code-line"><b>export</b> XILINXD_LICENSE_FILE=2100@192.168.95.253</code>
+<code class="code-line"></code>
+<code class="code-line">tool_dir=""</code>
+<code class="code-line"><b>case</b> $tool in</code>
+<code class="code-line">	"vivado")         tool_dir="Vivado" ;;</code>
+<code class="code-line">	"vitis_hls")      tool_dir="Vitis" ;;</code>
+<code class="code-line">	"vitis_analyzer") tool_dir="Vitis" ;;</code>
+<code class="code-line">	*) <b>echo</b> "unkown tool '$tool'" && <b>exit</b> 1</code>
+<code class="code-line"><b>esac</b></code>
+<code class="code-line"></code>
+<code class="code-line"><b>export</b> LC_ALL="C"</code>
+<code class="code-line"></code>
+<code class="code-line">tool_path=/tools/Xilinx/"$tool_dir"/"$version"</code>
+<code class="code-line"># Starting from version 2025.1 AMD chagned the default installation path.</code>
+<code class="code-line"><b>if</b> awk "BEGIN { exit !($version >= 2025.1) }"; <b>then</b></code>
+<code class="code-line">	tool_path=/tools/Xilinx/"$version"/"$tool_dir"</code>
+<code class="code-line"><b>fi</b></code>
+<code class="code-line">. "$tool_path"/settings64.sh</code>
+<code class="code-line"></code>
+<code class="code-line"><b>cd</b> /tmp</code>
+<code class="code-line">$tool</code>
+</pre>
+
+<p>
+Decent!
+Now, we need a shell script for FreeBSD.
+I called this file <i>run-gui-freebsd.sh</i>, and it looks as follows:
+</p>
+
+<pre class="code-block">
+<code class="code-line">#!/bin/sh</code>
+<code class="code-line"></code>
+<code class="code-line"><b>set</b> -e</code>
+<code class="code-line"></code>
+<code class="code-line">tool=$1</code>
+<code class="code-line">version=$2</code>
+<code class="code-line"></code>
+<code class="code-line">cmd="su $DOAS_USER -c \</code>
+<code class="code-line">	\"/home/$DOAS_USER/data/dotfiles/amd/run-gui-linux.sh $tool $version\""</code>
+<code class="code-line"></code>
+<code class="code-line">doas chroot /compat/ubuntu-22.04/ /bin/bash -c "$cmd"</code>
+</pre>
+
+<p>
+Nothing fancy.
+It simply changes root, switches user in Ubuntu and calls the <i>run-gui-linux.sh</i> script with proper arguments.
+</p>
+
+<p>
+At this stage, we are able to open Vivado GUI by simply calling one script on the FreeBSD host:
+</p>
+
+<pre class="code-block">
+doas ./run-gui-freebsd.sh vivado 2025.1
+</pre>
+
+<p>
+However, we still have to explicitly provide the password and miss the application launcher.
+Let's handle the password first.
+</p>
+
+<p>
+I assume you use <code>doas</code> instead of <code>sudo</code> on FreeBSD.
+If you use <code>sudo</code>, you have to figure out this step on your own.
+We just need to add one line to the <i>/usr/local/etc/doas.conf</i> file to allow user to call <i>run-gui-freebsd.sh</i> script without providing password.
+In my case, the line looks like this:
+</p>
+
+<pre class="code-block">
+permit nopass mkru as root cmd /home/mkru/data/dotfiles/amd/run-gui-freebsd.sh
+</pre>
+
+<p>
+<b>WARNING 1:</b>
+The path to the script must be absolute!
+If you provide just the script name or a partial path, you will create a security hole.
+If someone, somehow, logs in to your account, he/she/it will be able to gain root privileges by simply creating and calling a script with the same name.
+</p>
+
+<p>
+<b>WARNING 2:</b>
+You must change the owner and group of your FreeBSD script.
+In my case, this is <i>run-gui-freebsd.sh</i> file.
+This script can be executed with root privileges without providing password.
+If someone, somehow, logs in to your account, he/she/it will be able to gain root privileges by simply editting the script.
+Change the owner to <code>root</code> and group to <code>wheel</cdoe>.
+</p>
+
+<pre class="code-block">
+doas chown root run-gui-freebsd.sh
+doas chgrp wheel run-gui-freebsd.sh
+</pre>
+
+<p>
+At this stage, we can open Vivado GUI by just calling one script without providing any passwords.
+Just remember two things:
+<ol>
+<li>the path to the script must be preceded with <code>doas</code>,</li>
+<li>the path to the script must be absolute.</li>
+</ol>
+</p>
+
+<p>
+In my case, I can open Vivado GUI without providing any password by executing the following command:
+</p>
+
+<pre class="code-block">
+doas /home/mkru/data/dotfiles/amd/run-gui-freebsd.sh vivado 2025.1
+</pre>
+
+<p>
+The last thing we have to prepare is the application launcher.
+This is easy.
+The Vivado installer should already create applications <code>.desktop</code> files in the <i>~/.local/share/applications/</i> directory.
+Open the file for Vivado (on my system it is named <i>Vivado 2025.1_1756978682175.desktop</i>) and adjust the value of the <code>Exec</code> attribute.
+Optionally, you can fix the icon displaying by fixing the path in the <code>Icon</code> attribute.
+My <code>.desktop</code> file for Vivado 2025.1 looks as follows:
+</p>
+
+<pre class="code-block">
+<code class="code-line">[Desktop Entry]</code>
+<code class="code-line">Encoding=UTF-8</code>
+<code class="code-line">Type=Application</code>
+<code class="code-line">Name=Vivado 2025.1</code>
+<code class="code-line">Comment=Vivado 2025.1</code>
+<code class="code-line">Icon=/compat/ubuntu-22.04/tools/Xilinx/2025.1/Vivado/doc/images/vivado_logo.png</code>
+<code class="code-line">Exec=doas /home/mkru/data/dotfiles/amd/run-gui-freebsd.sh vivado 2025.1</code>
+</pre>
+
+<p>
+At this stage, you should be able to launch Vivado GUI on FreeBSD like a regular GUI application.
+</p>
+
+<h2>I want even more (running vivado command like a pro)</h2>
+
+<p>
+I am able to run Vivado GUI easily.
+However, I mainly open the GUI for reports viewing, programming, or debugging.
+I handle most of the build or test work with scripts.
+To be able to run my scripts, the FreeBSD shell environment has to see some <code>vivado</code> command.
+</p>
+
+<p>
+Having <code>vivado</code> on the FreeBSD host as a regular command is a little bit harder because we can't simply source the proper Vivado settings script.
+Vivado was installed in Ubuntu chroot environment, not on the FreeBSD host.
+It won't fly.
+Moreover, we have to preserve the working directory.
+This is a new requirement compared to the Vivado GUI.
+We have to emulate the behavior.
+</p>
+
+<p>
+Instead of sourcing a proper Vivado settings script before starting work, I export the desired Vivado version.
+This is as simple as:
+</p>
+
+<pre class="code-block">
+export VIVADO_VERSION=2025.1
+</pre>
+
+<p>
+This is, of course, a custom environment variable, so you can name it whatever you want.
+I prefer full words.
+If I used, for example, <code>VIVVER</code>, I would probably forget the meaning in a few months.
+</p>
+
+<p>
+Now, we need two shell scripts.
+One for the FreeBSD host and one for the Ubuntu chroot.
+This is similar to the Vivado GUI scenario.
+However, this time, the script for FreeBSD host must be available in your <code>$PATH</code>, and must be named <code>vivado</code>.
+On my machines, I keep such scripts in <i>~/data/dotfiles/bin/</i> directory.
+Then, I export this path to the <code>$PATH</code> variable in <i>.bash_profile</i> file.
+You can do the same, or use <code>.profile</code> or <code>.bashrc</code> file.
+Whatever approach you like.
+</p>
+
+<p>
+My <i>vivado</i> script looks as follows:
+</p>
+
+<pre class="code-block">
+<code class="code-line">#!/bin/sh</code>
+<code class="code-line"></code>
+<code class="code-line"><b>if</b> [ -z "$VIVADO_VERSION" ]; <b>then</b></code>
+<code class="code-line">	<b>echo</b> "VIVADO_VERSION is unset or empty"</code>
+<code class="code-line">	<b>exit</b> 1</code>
+<code class="code-line"><b>fi</b></code>
+<code class="code-line"></code>
+<code class="code-line">doas "/home/$USER/data/dotfiles/amd/vivado.sh" "$VIVADO_VERSION" "$*"</code>
+</pre>
+
+<p>
+It basically checks whether the <code>$VIVADO_VERSION</code> environment variable is set and redirects arguments to the <i>vivado.sh</i> script responsible for the actual logic.
+Why is the <i>vivado</i> script even required in such a case?
+Well, it is required because I want to call <code>vivado</code> in the shell without the <code>doas</code> prefix.
+It makes my <a href="https://github.com/m-kru/hbs">hbs</a> build system portable between FreeBSD and Linux.
+The second reason is avoiding root privilege escalation.
+</p>
+
+<p>
+The <i>vivado.sh</i> script I keep in <i>~/data/dotfiles/amd/</i> directory.
+This is the same directory where I keep scripts for running Vivado GUI.
+The content of the <i>vivado.sh</i> file is as follows:
+</p>
+
+<pre class="code-block">
+<code class="code-line">#!/bin/sh</code>
+<code class="code-line"><b>set</b>  -e</code>
+<code class="code-line"></code>
+<code class="code-line">version=$1</code>
+<code class="code-line"><b>shift</b></code>
+<code class="code-line"></code>
+<code class="code-line">vivado_path=/tools/Xilinx/Vivado/"$version"</code>
+<code class="code-line"># Starting from version 2025.1 AMD chagned the default installation path.</code>
+<code class="code-line"><b>if</b> awk "BEGIN { exit !($version >= 2025.1) }"; <b>then</b></code>
+<code class="code-line">	vivado_path=/tools/Xilinx/"$version"/Vivado</code>
+<code class="code-line"><b>fi</b></code>
+<code class="code-line"></code>
+<code class="code-line">cmd="su $DOAS_USER -c \</code>
+<code class="code-line">	\"export XILINXD_LICENSE_FILE=2100@192.168.95.253;</code>
+<code class="code-line">	cd $(pwd);</code>
+<code class="code-line">	export _JAVA_AWT_WM_NONREPARENTING=1;</code>
+<code class="code-line">	. $vivado_path/settings64.sh;</code>
+<code class="code-line">	vivado $*\""</code>
+<code class="code-line"></code>
+<code class="code-line">doas chroot /compat/ubuntu-22.04/ /bin/bash -c "$cmd"</code>
+</pre>
+
+<p>
+This time, the FreeBSD host script doesn't start accompanying Linux script in the Ubuntu chroot.
+Why?
+Because in this particular case, this extra layer of indirection doesn't bring any value.
+</p>
+
+<p>
+I export <code>_JAVA_AWT_WM_NONREPARENTING</code> to be able to start Vivado GUI from the command line whenever the proper <code>$VIVADO_VERSION</code> environment variable is exported.
+I actually never do this, but I want the <code>vivado</code> command to behave exactly the same on FreeBSD and Linux.
+</p>
+
+<p>
+Remember to adjust the port and IP address for the license to your needs.
+</p>
+
+<p>
+To be able to run the <code>vivado</code> command from the shell without providing any password and without creating any security hole we must do what we already did for Vivado GUI.
+However, this time, for the <i>vivado.sh</i> file.
+Change the owner of the file to <code>root</code> and the group to <code>wheel</code>.
+Finally, adjust and add the following line to the <i>doas.conf</i> file.
+</p>
+
+<pre class="code-block">
+permit nopass mkru as root cmd /home/mkru/data/dotfiles/amd/vivado.sh
+</pre>
+
+
+<h2>Afterword</h2>
+
+<p>
+You won't be able to program or debug FPGAs by simply connecting USB programmers to your FreeBSD machine.
+This is because there are no drivers for FreeBSD.
+And there are no drivers, because the documentation is closed-source.
+However, there are workarounds, some of which I have mentioned in <a href="../freebsd-vivado.html">FreeBSD: Running Vivado on FreeBSD</a> post.
+</p>
+
+<p>
+You probably noticed that I am exporting my whole home directory to Ubuntu as I mount it there.
+It would be better only to mount the necessary part of your workspace, and the directory with the shell scripts required by Ubuntu.
+This way, Vivado, and other stuff you install on Ubuntu, would not be able to scan your private data.
+However, currently, I don't care about it.
+To apply the security improvement, you just need more specific mount entries in <i>/etcfstab/</i> file.
+Instead of mounting the entire home, mount particular directories.
+If you work on a machine used by multiple users, then at least try to mount only <i>/home/$USER</i> if other users don't require the Ubuntu environment.
+</p>
+
+<p>
+You probably also noticed that my shell scripts don't verify user arguments.
+This is because:
+<ol>
+  <li>
+    These scripts are not intended to be directly executed by the user in an interactive shell.
+    There is always some wrapper logic calling the scripts with arguments.
+  </li>
+  <li>
+    If something is wrong with the script arguments, the process will fail in one way or another.
+    For example, if the provided Vivado version is incorrect, then you will see an error message saying that the path doesn't exist.
+  </li>
+</ol>
+</p>
+
+<p>
+I have run Vivado 2025.1 and 2023.2 on FreeBSD using chroot.
+I haven't experienced any troubles so far.
+If you have, feel free to <a href="../../contact.html">contact</a> me.
+Maybe we can figure out what is going on together.
+</p>
+
+</body>
+
+</html>
