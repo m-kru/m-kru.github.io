@@ -106,7 +106,7 @@ I can think of the following 4 possible ways of running Vivado on FreeBSD.
 Using methods 2 (Linuxulator with chroot) and 3 (Linux jail) you can compile designs.
 However, you are not able to program devices.
 The good news is that there are decent solutions for this problem.
-I haven't tried them yet, but I am sure some of them work (1,2 and 3), and I will describe them in separate posts.
+I haven't tried them yet, but I am sure some of them work (1,2 3, and 4), and I will describe them in separate posts.
 <ol>
 <li>
   Investing in <a href="https://www.amd.com/en/products/adaptive-socs-and-fpgas/board-accessories/smartlynq-data-cable.html">SmartLynq Data Cable</a> or <a href="https://www.amd.com/en/products/adaptive-socs-and-fpgas/board-accessories/smartlynq-plus.html">SmartLynq+ Module</a>.
@@ -117,6 +117,11 @@ I haven't tried them yet, but I am sure some of them work (1,2 and 3), and I wil
 <li>
   Running Vivado hw_server on small (or big) single-board computer (SBC), for example Dell Wyse 3040 (cheap) or Intel UP 4000 (a little more expensive), and connecting to it via network.
   This is basically a recreation of SmartLynq Data Cable functionality in a cheaper way.
+</li>
+<li>
+  You can utilize FSBL (First Stage Bootloader) or U-Boot on SoC platforms to program the FPGA part.
+  You won't be able to debug the design in a classic way.
+  However, on SoC, there are other ways to debug the logic.
 </li>
 <li>Running Vivado hw_server, or whole Vivado in virtual machine (bhyve).</li>
 <li>Using <a href="https://github.com/kholia/xvc-pico">xvc-pico</a>. I think no one has tried to run it on FreeBSD so far, so it might require additional tweaks.</li>
