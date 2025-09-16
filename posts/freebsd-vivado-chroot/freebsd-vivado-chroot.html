@@ -119,6 +119,11 @@ debootstrap jammy /compat/ubuntu-22.04
     It is a one-time job.
     When you add a user on Ubuntu, it is probably also a good idea to configure the shell to your favourite.
     I prefer <code>bash</code>.
+    In my case, I use the following commands on chroot Ubuntu to add a user:
+<pre class="code-block">
+groupadd -g 1001 mkru
+useradd -u 1001 -g 1001 -s /usr/bin/bash mkru
+</pre>
   </li>
   <li>
     <b>Adding the package repositories missing from defaults.</b>
