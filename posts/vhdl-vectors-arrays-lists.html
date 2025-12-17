@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>mkru</title>
+  <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+  <link href="../css/style.css" type="text/css" rel="stylesheet"/>
+</head>
+
+<body>
+
+<header>
+  <nav class="nav-left">
+    <a href="../index.html">mkru</a>
+  </nav>
+
+  <nav class="nav-right">
+  <a href="../about.html">About</a>
+  | <a href="../contact.html">Contact</a>
+  | <a href="../resume.html">Resume</a>
+  </nav>
+</header>
+
+<time>17 Dec, 2025</time><br>
+<h1>VHDL: A few words on vectors, arrays and lists</h1>
+
+<div class="tldr">
+<p style="margin-top:0px">
+<b>TLDR</b><br>
+<ol>
+  <li>Vectors and arrays have <b>fixed</b> size.</li>
+  <li>Lists have <b>dynamic</b> size.</li>
+  <li>Vectors should be syntactically <b>one-dimensional</b>.</li>
+  <li>Arrays can be syntactically <b>n-dimensional</b>.</li>
+  <li>Lists can be <b>n-dimensional</b>, but are usually one-dimensional.</li>
+  <li>Vectors, arrays and lists can be semantically <b>n-dimensional</b>.</li>
+</ol>
+</p>
+</div>
+
+<h2>Background</h2>
+
+<p>
+I sometimes come across VHDL code with suboptimal type names.
+I mean mainly the names of types aggregating objects of another type.
+There is nothing wrong with using arbitrary names.
+There is no VHDL police.
+You can name your types however you want.
+However, other engineers, or maybe even you from the future, will thank you if you stick to some very simple rules of thumb.
+</p>
+
+<h2>Vectors and arrays vs lists</h2>
+
+<p>
+Most programming languages have more or less strict rules on what can be named as a vector, array, or list.
+I don't want to discuss the general overview of this topic in this post, as I want to focus solely on VHDL.
+VHDL is a hardware description language, and as such, it addresses problems in a different domain.
+</p>
+
+<p>
+VHDL is a strongly-typed language.
+It doesn't allow implicit type conversions and enforces data type checks.
+Even if two types from the logical point of view look the same, they are not the same for a VHDL compiler.
+I mean distinct types here, not subtypes, which follow slightly different rules.
+</p>
+
+<p>
+The main difference between vectors, arrays, and lists is that vectors and arrays have a runtime fixed size, while lists have runtime dynamic size.
+I don't mean that you have to constrain vector and array types during type definition.
+It is usually even better to have these types unconstrained, as such types are more flexible because the user can constrain them during object instantiation.
+What I mean, is that vector and array types sizes don't change during simulation or while your device is operating.
+Changing the vector or array size requires a change in the source code and recompilation.
+</p>
+
+<p>
+The second difference is that vectors and arrays are frequently used for hardware description.
+They synthesize easily.
+On the other hand, lists, due to their dynamic nature, are used for simulations only.
+At least I have never seen VHDL lists being used for synthesizable logic.
+This is technically feasible if the compilers were able to deduce the maximum list size based on the description.
+</p>
+
+<h2>Vectors vs arrays</h2>
+
+<p>
+From the user's perspective, there is almost no difference between vectors and arrays.
+Almost, because they are indexed differently.
+This is a significant difference, as you will get an error during the analysis stage if you use improper indexing.
+That is why I like it when the type name clearly indicates to its users how its elements should be indexed.
+</p>
+
+<p>
+I really like to follow the concept that vectors are syntactically <b>one-dimensional</b> and arrays can be syntactically <b>n-dimensional</b>.
+This is not a formal concept.
+I doubt	you can find it in any international standard.
+I was first introduced to this concept by an older professor at my university (Warsaw University of Technology).
+Since then, I have never had to use LSP (Language Server Protocol) or grep through files to get to know how to properly index elements.
+</p>
+
+<p>
+Now, let's move from the theory to practice.
+The snippet below is taken from my open-source <a href="https://github.com/m-kru/vhdl-amba5/tree/master/apb">APB</a> library.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line">--<i> A one-dimensional array of data with the width equal to the APB maximum data width.</i></code>
+<code class="code-line"><b>type</b> data_array_t <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> <b>std_logic_vector</b>(31 <b>downto</b> 0);</code>
+<code class="code-line"></code>
+<code class="code-line">--<i> A two-dimensional array of data with the width equal to the APB maximum data width.</i></code>
+<code class="code-line"><b>type</b> data_array_2d_t <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>, <b>natural</b> <b>range</b> &lt>) <b>of</b></code>
+<code class="code-line">  <b>std_logic_vector</b>(31 <b>downto</b> 0);</code>
+<code class="code-line"></code>
+<code class="code-line">--<i> An alias to the data_array_t.</i></code>
+<code class="code-line"><b>alias</b> data_vector_t <b>is</b> data_array_t;</code>
+<code class="code-line"></code>
+<code class="code-line">--<i> A two-dimensional vector of APB data with maximum data width.</i></code>
+<code class="code-line"><b>type</b> data_vector_2d_t <b>is</b> <b>array</b> (<b>natural</b> <b>range</b> &lt>) <b>of</b> data_vector_t;</code>
+</pre>
+
+<p>
+There are a few things I would like to elaborate on.
+<ol>
+  <li>
+  Vectors are syntactically one-dimensional.
+  However, it doesn't mean you can't create semantically n-dimensional objects by defining solely vectors.
+  It means that at each level of indexing, there is only one dimension.
+  However, there can be multiple levels of indexing.
+  An example is the <code>data_vector_2d_t</code> type.
+  </li>
+  <li>
+  In the case of one dimension and one indexing level, the vector type is identical to the array type.
+  This is why <code>data_vector_t<code> is defined as an alias to the <code>data_array_t</code> type.
+  </li>
+  <li>
+  I like to keep the entire "array" and "vector" words in type names.
+  I know some people abbreviate these words to "arr" and "vec".
+  I don't think that saving two and  three letters in these cases is worth compromising legibility.
+  Moreover, in standard libraries, vector types also embed the word "vector" in their names, for example, <code>std_logic_vector</code>.
+  </li>
+  <li>
+  I like to indicate the semantic indexing dimension as a suffix in a type name, for example, <code>2d</code>, <code>3d</code>, etc.
+  Why suffix?
+  Because it keeps the core type as the first one in the type name.
+  I also think this order is better if you use the autocomplete feature in your text editor.
+  </li>
+</ol>
+<p>
+
+<p>
+Let's see what the difference between utilizing <code>data_array_2d_t</code> and <code>data_vector_2d_t</code> types is.
+If you haven't understood me so far, now things should get clearer.
+The snippet below presents how to define and use objects of both types.
+</p>
+
+<pre class="code-block VHDL">
+<code class="code-line">--<i> Two-dimensional vector usage example.</i></code>
+<code class="code-line"><b>signal</b> MEMORY_VECTOR : data_vector_2d_t(0 <b>to</b> 1)(0 <b>to</b> 1);</code>
+<code class="code-line">MEMORY_VECTOR(0)(0) <= x"A5A5A5A5";</code>
+<code class="code-line"></code>
+<code class="code-line">--<i> Two-dimensional array usage example.</i></code>
+<code class="code-line"><b>signal</b> MEMORY_ARRAY : data_array_2d_t(0 <b>to</b> 1, 0 <b>to</b> 1);</code>
+<code class="code-line">MEMORY_ARRAY(0,0) <= x"A5A5A5A5";</code>
+</pre>
+
+<p>
+From the semantical point of view, both <code>MEMORY_VECTOR</code> and <code>MEMORY_ARRAY</code> represent two-dimensional memory with equal overall capacity.
+However, syntactically, they are indexed differently.
+The vector version has two levels of one-dimensional indexing.
+The array version has one level of two-dimensional indexing.
+Moreover, from the VHDL perspective, these are two distinct types.
+</p>
+
+<h2>Lists</h2>
+
+<p>
+Lists have a dynamic size.
+They can shrink and grow during runtime.
+By runtime, I mean only simulation here.
+I have never seen lists getting synthesized into real hardware.
+</p>
+
+<p>
+Lists are cumbersome in VHDL.
+There is no native support for lists in VHDL.
+Most of the time, they represent custom types and are implemented from scratch using protected types.
+Moreover, true lists can be implemented in VHDL as linked lists only.
+This is not an optimal implementation from the memory allocation perspective, as each element requires separate memory allocation.
+This can potentially significantly slow down the simulation and fragment your memory, which can slow it down even more.
+You probably won't notice this on any decent machine unless you allocate hundreds of thousands or millions of objects.
+</p>
+
+<p>
+Compared to the vector and array examples, the list example requires more code.
+This is why I don't include it in this post.
+I think lists require their own post, so that they can be explained thoroughly.
+</p>
+
+</body>
+
+</html>
